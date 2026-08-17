@@ -1,0 +1,110 @@
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+
+  extends: ["config:recommended"],
+
+  // Once a week, in UTC. Updates arrive as one Monday-morning batch rather than a trickle of a PR
+  // a day — every pull request here runs the full build, MinIO and the live tests included, and
+  // that is not cheap.
+  timezone: "Etc/UTC",
+  schedule: ["before 6am on monday"],
+
+  // Commit messages here are Conventional Commits, and a hook enforces it.
+  semanticCommits: "enabled",
+
+  labels: ["dependencies"],
+
+  prConcurrentLimit: 5,
+  prHourlyLimit: 0,
+
+  // Renovate merges the pull request itself rather than arming GitHub's auto-merge: GitHub refuses
+  // to arm it on a branch with no required checks, and adding branch protection to `main` would
+  // change how this repository is worked in.
+  platformAutomerge: false,
+
+  // Vulnerabilities are the one thing that ignores the schedule.
+  vulnerabilityAlerts: {
+    schedule: ["at any time"],
+    labels: ["dependencies", "security"],
+  },
+
+  ignorePaths: ["**/build/**", "**/.gradle/**"],
+
+  packageRules: [
+    {
+      description: "Kotlin: the compiler and its plugins move as one version, and that is never a routine bump",
+      matchPackageNames: ["/^org\\.jetbrains\\.kotlin[:.]/"],
+      groupName: "kotlin",
+    },
+    {
+      description: "kotlinx ships as one release train — one PR",
+      matchPackageNames: ["/^org\\.jetbrains\\.kotlinx[:.]/"],
+      groupName: "kotlinx",
+    },
+    {
+      // The reason this rule exists is specific to this library: `ktor-client-curl` links libcurl
+      // and OpenSSL statically inside its cinterop klib, so the TLS stack is whatever Ktor shipped
+      // (docs/research/research-architecture.md, fact 1.1 and risk 1). A Ktor bump is a TLS bump,
+      // and a CVE fix in OpenSSL arrives only this way — which is exactly why it wants a human
+      // reading it rather than a merge, and its own branch rather than a ride along with kotlinx.
+      description: "Ktor carries the TLS stack: check which OpenSSL the new version bundles",
+      matchPackageNames: ["/^io\\.ktor[:.]/"],
+      groupName: "ktor",
+      automerge: false,
+      labels: ["dependencies", "tls"],
+    },
+    {
+      // `strings` over `libcrypto.a` inside the cinterop klib is the only way to read it, and the
+      // README states the version, so a bump that nobody checked leaves the README lying.
+      description: "Ktor: say what to check before merging",
+      matchPackageNames: ["/^io\\.ktor[:.]/"],
+      prBodyNotes: [
+        ":warning: Ktor bundles libcurl and OpenSSL statically, so this is also a TLS bump. Read the version out of the new klib before merging, and update the README if it changed:",
+        "```sh\nunzip -p ~/.gradle/caches/modules-2/files-2.1/io.ktor/ktor-client-curl-linuxx64/*/*/*-cinterop-libcurl.klib default/targets/linux_x64/included/libcrypto.a | strings | grep -oE 'OpenSSL [0-9.]+[a-z]?' | sort -u\n```",
+      ],
+    },
+    {
+      // The tag is pinned because MinIO's `latest` stopped moving on 2025-09-07, so following it
+      // would neither give updates nor stay honest about what is being tested. A new release is
+      // worth knowing about; taking it is a decision, and the whole suite gets re-run after.
+      description: "The test server is pinned deliberately — a new tag is a decision, not a bump",
+      matchManagers: ["docker-compose"],
+      automerge: false,
+      additionalBranchPrefix: "minio-",
+      labels: ["dependencies", "test server"],
+    },
+    {
+      description: "Base images: changing the distro under a native binary is a decision, not a bump",
+      matchManagers: ["dockerfile"],
+      automerge: false,
+      // Own branch, so the image never rides along with anything else.
+      additionalBranchPrefix: "docker-",
+    },
+    {
+      description: "ktlint is build tooling, not a runtime dependency",
+      matchPackageNames: ["/^com\\.pinterest\\.ktlint[:.]/"],
+      matchUpdateTypes: ["minor", "patch"],
+      automerge: true,
+    },
+    {
+      description: "The build harness arrives as one PR, not one per action",
+      matchManagers: ["github-actions"],
+      groupName: "ci actions",
+    },
+    {
+      description: "Majors of anything that ships get a human",
+      matchUpdateTypes: ["major"],
+      automerge: false,
+      labels: ["dependencies", "major"],
+    },
+    // Last, so it wins over the major rule above. A major of `actions/checkout` is not the same
+    // kind of event as a major of Ktor: the build harness is not shipped to anyone, and the check
+    // that would catch a bad bump is the build itself — which already ran on the pull request.
+    {
+      description: "The build harness merges itself, majors included: CI on pull_request is the review",
+      matchManagers: ["github-actions", "gradle-wrapper"],
+      automerge: true,
+      automergeType: "pr",
+    },
+  ],
+}
