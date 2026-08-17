@@ -22,8 +22,16 @@ kotlin {
     // Target platform number one; milestones are closed against it.
     linuxX64()
 
-    // The host target for the local TDD loop: linuxX64 tests do not run on macOS.
+    // Apple. The engine there is `ktor-client-darwin` — `ktor-client-curl` publishes nothing for
+    // iOS at all (docs/research/research-architecture.md, fact 1.11).
+    //
+    // `watchos` and `tvos` are left out although every dependency publishes them: no test has ever
+    // run there, and "it compiles" is a different claim from "it works".
     macosArm64()
+    macosX64()
+    iosArm64()
+    iosSimulatorArm64()
+    iosX64()
 
     compilerOptions {
         allWarningsAsErrors.set(true)
