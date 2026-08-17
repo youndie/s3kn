@@ -4,8 +4,9 @@ plugins {
 
 // Where the artefacts go.
 //
-// Snapshots only, to a private Reposilite. Credentials are never written here: they come from the
-// environment, so a checkout of this repository builds and tests but cannot publish.
+// Snapshots only, to a Reposilite that is readable without credentials and writable with them.
+// The credentials are never written here: they come from the environment, so a checkout of this
+// repository builds and tests but cannot publish.
 //
 // Nothing is signed. A signature is Maven Central's requirement, not a snapshot repository's, and
 // demanding a GPG key for every snapshot would put one into CI for no reason.
