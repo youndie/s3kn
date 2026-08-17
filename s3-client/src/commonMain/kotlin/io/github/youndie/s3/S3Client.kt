@@ -16,6 +16,8 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpMethod
 import io.ktor.http.isSuccess
 import io.ktor.utils.io.ByteReadChannel
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 
 /**
  * What `HEAD` reports about an object.
@@ -209,6 +211,76 @@ public class S3Client(
     ) {
         execute(S3Operation(method = "DELETE", bucket = bucket, key = key))
     }
+
+    /**
+     * Lists one page of a bucket's contents.
+     *
+     * Use [list] unless you are driving the paging yourself; this is what it is built on.
+     *
+     * @param prefix restrict to keys starting with it.
+     * @param delimiter roll keys sharing a segment up into [S3ListPage.commonPrefixes].
+     * @param maxKeys upper bound on this page; S3 caps it at 1000 regardless.
+     * @param continuationToken [S3ListPage.nextContinuationToken] of the previous page.
+     * @param startAfter begin after this key, as a one-shot alternative to a token.
+     */
+    public suspend fun listPage(
+        bucket: String,
+        prefix: String? = null,
+        delimiter: String? = null,
+        maxKeys: Int? = null,
+        continuationToken: String? = null,
+        startAfter: String? = null,
+    ): S3ListPage {
+        val query =
+            buildList {
+                add("list-type" to "2")
+                // Always, never on request. A key may hold any Unicode character, including ones an
+                // XML 1.0 parser cannot represent at all, and without this the document itself is
+                // malformed — in the user's bucket, not in our tests
+                // (docs/spec/s3-service-2.json, shapes.EncodingType).
+                add("encoding-type" to "url")
+                prefix?.let { add("prefix" to it) }
+                delimiter?.let { add("delimiter" to it) }
+                maxKeys?.let { add("max-keys" to it.toString()) }
+                continuationToken?.let { add("continuation-token" to it) }
+                startAfter?.let { add("start-after" to it) }
+            }
+
+        val response = execute(S3Operation(method = "GET", bucket = bucket, query = query))
+        return parseListBucketResult(response.bodyAsText())
+    }
+
+    /**
+     * Lists a bucket page by page, fetching each one only when it is asked for.
+     *
+     * A bucket can hold millions of keys, so the whole listing is never assembled: the flow emits a
+     * page, and the next request happens only if the collector asks for more. Stopping early — a
+     * `first`, a `take`, a `return` out of `collect` — stops the requests.
+     */
+    public fun list(
+        bucket: String,
+        prefix: String? = null,
+        delimiter: String? = null,
+        maxKeys: Int? = null,
+        startAfter: String? = null,
+    ): Flow<S3ListPage> =
+        flow {
+            var token: String? = null
+            do {
+                val page =
+                    listPage(
+                        bucket = bucket,
+                        prefix = prefix,
+                        delimiter = delimiter,
+                        maxKeys = maxKeys,
+                        continuationToken = token,
+                        // Only the first request carries it; afterwards the token is the position.
+                        startAfter = startAfter.takeIf { token == null },
+                    )
+                emit(page)
+                token = page.nextContinuationToken
+            } while (page.isTruncated && token != null)
+        }
 
     private fun contentTypeHeader(contentType: String?): List<Pair<String, String>> =
         contentType?.let { listOf("Content-Type" to it) } ?: emptyList()

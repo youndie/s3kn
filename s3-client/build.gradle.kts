@@ -11,6 +11,9 @@ kotlin {
         commonMain.dependencies {
             api(projects.s3Sigv4)
             api(libs.ktor.client.core)
+            // A listing is a Flow of pages: a bucket can hold millions of keys, so the whole
+            // listing is never assembled.
+            api(libs.kotlinx.coroutines.core)
         }
         commonTest.dependencies {
             implementation(projects.s3Testing)

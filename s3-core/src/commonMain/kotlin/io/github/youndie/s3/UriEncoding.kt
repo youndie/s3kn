@@ -23,6 +23,64 @@ public fun uriEncodeKey(key: String): String = uriEncode(key, encodeSlash = fals
 public fun uriEncodeQueryComponent(value: String): String = uriEncode(value, encodeSlash = true)
 
 /**
+ * Reverses [uriEncodeKey] and [uriEncodeQueryComponent].
+ *
+ * Needed because a listing sends `encoding-type=url`, so every key S3 returns arrives encoded
+ * (docs/api/protocol-s3.md, section 4.5). Decoding is done over bytes and only then turned into
+ * text: one code point can arrive as four separate `%XX` groups, and decoding them one at a time
+ * yields replacement characters.
+ *
+ * @param plusIsSpace how to read a `+`.
+ *
+ * URI encoding has no special meaning for `+`; form encoding reads it as a space. Both appear here,
+ * because **a listing response uses the form reading**: servers write a space in a key as `+`, and
+ * the reference implementation decodes those responses with `unquote_plus`
+ * (`botocore/compat.py:62`, `unquote_str = unquote_plus`). Verified against a live server, which
+ * returns `my+dir` for a key containing `my dir`.
+ *
+ * It is unambiguous either way: a literal `+` in a key is not an unreserved character, so it
+ * arrives as `%2B`.
+ *
+ * @throws IllegalArgumentException on a `%` that is not followed by two hex digits. Passing a
+ *   broken escape through would return a key that looks plausible and is wrong.
+ */
+public fun uriDecode(
+    value: String,
+    plusIsSpace: Boolean = false,
+): String {
+    if ('%' !in value && !(plusIsSpace && '+' in value)) return value
+
+    // An upper bound: an unencoded non-ASCII character is several bytes, and every `%XX` group
+    // shrinks three bytes into one. Sizing this by the character count would overflow on the first
+    // key that mixes the two.
+    val bytes = ByteArray(value.encodeToByteArray().size)
+    var length = 0
+    var index = 0
+    while (index < value.length) {
+        val character = value[index]
+        if (character == '+' && plusIsSpace) {
+            bytes[length++] = ' '.code.toByte()
+            index++
+            continue
+        }
+        if (character != '%') {
+            for (byte in character.toString().encodeToByteArray()) {
+                bytes[length++] = byte
+            }
+            index++
+            continue
+        }
+
+        require(index + 2 < value.length) { "Truncated percent-escape at index $index in \"$value\"" }
+        val code = value.substring(index + 1, index + 3).toIntOrNull(radix = 16)
+        requireNotNull(code) { "Invalid percent-escape \"${value.substring(index, index + 3)}\" in \"$value\"" }
+        bytes[length++] = code.toByte()
+        index += 3
+    }
+    return bytes.decodeToString(endIndex = length)
+}
+
+/**
  * `UriEncode` as AWS defines it: everything outside `A-Za-z0-9-_.~` becomes `%XX` over the UTF-8
  * bytes, with upper-case hex digits. A space is `%20` and never `+`.
  */

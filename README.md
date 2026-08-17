@@ -2,8 +2,8 @@
 
 An S3 client for Kotlin/Native. First target: `linuxX64`.
 
-**Status: M5 done — `put`, `get`, `delete`, `head` and presigned URLs all work against MinIO.
-Listing and multipart upload are next.**
+**Status: M6 done — `put`, `get`, `delete`, `head`, listing and presigned URLs all work against
+MinIO. Multipart upload is next.**
 
 Scope of v1: `put`, `get`, `delete`, `head`, `list`, multipart upload, presigned URLs.
 

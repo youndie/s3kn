@@ -9,6 +9,7 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.http.isSuccess
 import io.ktor.utils.io.ByteReadChannel
 import io.ktor.utils.io.readRemaining
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import kotlinx.io.readByteArray
 import kotlin.test.Test
@@ -247,6 +248,72 @@ class S3ClientE2eTest {
 
             assertEquals(411, response.status.value, response.bodyAsText())
             assertEquals("MissingContentLength", parseErrorBody(response.bodyAsText())?.code)
+        }
+
+    @Test
+    fun `lists what it stored under a prefix`() =
+        runTest {
+            val fixture = fixture() ?: return@runTest
+            val prefix = "e2e/list/plain/"
+            listOf("a.txt", "b.txt", "c.txt").forEach {
+                fixture.client.put(E2E.bucket, prefix + it, it.encodeToByteArray())
+            }
+
+            val page = fixture.client.listPage(E2E.bucket, prefix = prefix)
+
+            assertEquals(listOf("a.txt", "b.txt", "c.txt").map { prefix + it }, page.objects.map { it.key })
+            assertEquals(3, page.keyCount)
+            assertTrue(!page.isTruncated)
+        }
+
+    @Test
+    fun `rolls keys up into common prefixes when given a delimiter`() =
+        runTest {
+            val fixture = fixture() ?: return@runTest
+            val prefix = "e2e/list/tree/"
+            listOf("top.txt", "one/a.txt", "one/b.txt", "two/c.txt").forEach {
+                fixture.client.put(E2E.bucket, prefix + it, it.encodeToByteArray())
+            }
+
+            val page = fixture.client.listPage(E2E.bucket, prefix = prefix, delimiter = "/")
+
+            assertEquals(listOf(prefix + "top.txt"), page.objects.map { it.key })
+            assertEquals(listOf(prefix + "one/", prefix + "two/"), page.commonPrefixes)
+        }
+
+    @Test
+    fun `walks a listing that does not fit in one page`() =
+        runTest {
+            val fixture = fixture() ?: return@runTest
+            val prefix = "e2e/list/paged/"
+            val keys = (1..5).map { "$prefix$it.txt" }
+            keys.forEach { fixture.client.put(E2E.bucket, it, "x".encodeToByteArray()) }
+
+            val pages = fixture.client.list(E2E.bucket, prefix = prefix, maxKeys = 2).toList()
+
+            assertTrue(pages.size >= 3, "expected more than one page, got ${'$'}{pages.size}")
+            assertEquals(keys.sorted(), pages.flatMap { page -> page.objects.map { it.key } }.sorted())
+        }
+
+    @Test
+    fun `lists a key whose name XML alone could not carry`() =
+        runTest {
+            // Why `encoding-type=url` is unconditional: an object key may hold any Unicode
+            // character, and some cannot appear in an XML 1.0 document at all
+            // (docs/spec/s3-service-2.json, shapes.EncodingType).
+            val fixture = fixture() ?: return@runTest
+            val prefix = "e2e/list/awkward/"
+            // Two of these are interesting before Unicode even enters into it. `<`, `>`, `&` and
+            // `"` have to survive being written into an XML document and read back out. And the
+            // pair `my dir` / `a+b` is what makes the decoding unambiguous: a space comes back as
+            // `+`, so a literal `+` had better come back as `%2B` — asserted here rather than
+            // assumed.
+            val keys = listOf("${prefix}my dir/файл.txt", "$prefix🙂", "${prefix}a<b>&c\"d\"", "${prefix}a+b")
+            keys.forEach { fixture.client.put(E2E.bucket, it, "x".encodeToByteArray()) }
+
+            val page = fixture.client.listPage(E2E.bucket, prefix = prefix)
+
+            assertEquals(keys.sorted(), page.objects.map { it.key }.sorted())
         }
 
     private class Fixture(

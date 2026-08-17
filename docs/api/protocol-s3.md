@@ -15,8 +15,8 @@ research: research-architecture
 реализация подписи (`reference/botocore-auth.py`), векторы (`aws-sig-v4-test-suite/`). Ссылка
 вида `s3-service-2.json:1596` указывает на строку в копии.
 
-Статус реализации: закрыты разделы 1–3, 4.1–4.4 и 5. Открыты 4.5 (`list`) и 4.6 (multipart) —
-целевые, код под ними появится в M6 и M7. Приёмка: 34 официальных вектора для общего SigV4,
+Статус реализации: закрыты разделы 1–3, 4.1–4.5 и 5. Открыт только 4.6 (multipart) — целевой,
+код под ним появится в M7. Приёмка: 34 официальных вектора для общего SigV4,
 20 сгенерированных из botocore для правил S3 и presign (`docs/spec/s3-signing-vectors/`), плюс
 живые запросы к MinIO из `docker-compose.yml`.
 
@@ -239,9 +239,19 @@ GET /<bucket>?list-type=2&encoding-type=url[&prefix=][&delimiter=][&max-keys=][&
 `s3-service-2.json:1014`, параметры — `shapes.ListObjectsV2Request.members`.
 
 `encoding-type=url` отправляется **всегда**, не по флагу: без него ключ с байтом 0x01 ломает XML
-на стороне сервера (`shapes.EncodingType.documentation`, ресёрч, следствие 1.5.3). Значит ключи в
-ответе приходят URL-кодированными и декодируются нами — включая `Prefix`, `Delimiter`,
-`StartAfter`, `ContinuationToken` и содержимое `CommonPrefixes`, а не только `Key`.
+на стороне сервера (`shapes.EncodingType.documentation`, ресёрч, следствие 1.5.3).
+
+Что декодируется в ответе: `Key`, верхнеуровневые `Prefix`, `Delimiter`, `StartAfter` и `Prefix`
+внутри `CommonPrefixes`. Список взят из **кода** эталонной реализации
+(`botocore/handlers.py`, `decode_list_object_v2`), а не из её комментария: комментарий называет ещё
+и `ContinuationToken`, а код его не трогает — и прав код, потому что токен непрозрачный и уезжает
+обратно дословно.
+
+> **Кодирование ответа — по-формному, а не по RFC 3986.** Пробел в ключе возвращается как `+`, а не
+> как `%20`, при том что в пути запроса тот же пробел кодируется как `%20`. Проверено живым
+> запросом; эталонная реализация декодирует эти ответы через `unquote_plus`
+> (`botocore/compat.py:62`). Неоднозначности нет: литеральный `+` не входит в unreserved и приезжает
+> как `%2B`. В библиотеке это `uriDecode(value, plusIsSpace = true)`.
 
 Ответ — `ListBucketResult`; поля — `shapes.ListObjectsV2Output.members`. Страница считается
 последней по `<IsTruncated>false</IsTruncated>`; следующая берётся по `NextContinuationToken`.
