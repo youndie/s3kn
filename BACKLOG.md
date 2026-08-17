@@ -57,12 +57,42 @@
 
 ## M1 — `:s3-core`: то, от чего зависит всё остальное
 
-- [ ] **M-10** `uriEncodeKey` — единственный кодировщик ключа, один на подпись и на URL ([Р4](docs/research/research-architecture.md), `botocore-auth.py:268`); векторы — таблица из [protocol-s3.md, раздел 2](docs/api/protocol-s3.md)
-- [ ] **M-11** Кодирование canonical query: `/` → `%2F`, сортировка по закодированному ключу, при равных ключах — по значению (`botocore-auth.py:268`)
-- [ ] **M-12** Формат метки времени `yyyyMMdd'T'HHmmss'Z'` из `kotlin.time.Instant` без `kotlinx-datetime` ([факт 1.7](docs/research/research-architecture.md)); тест на границу суток — дата в scope берётся из той же строки, а не считается отдельно
-- [ ] **M-13** `S3Config`: endpoint, регион, стиль адресации (path-style / virtual-hosted, [Открытый вопрос 3](docs/research/research-architecture.md)), учётные данные, `Clock`
-- [ ] **M-14** Вывод `host` из URL: нижний регистр, дефолтный порт отбрасывается, нестандартный остаётся (`botocore-auth.py:81`)
-- [ ] **M-15** Модель ошибок: `S3Exception` с кодом S3 **или** без него, статусом, `x-amz-request-id`, `x-amz-id-2` ([Риск 7](docs/research/research-architecture.md))
+- [x] **M-10** `uriEncodeKey` — единственный кодировщик ключа, один на подпись и на URL ([Р4](docs/research/research-architecture.md), `botocore-auth.py:268`); векторы — таблица из [protocol-s3.md, раздел 2](docs/api/protocol-s3.md)
+- [x] **M-11** Кодирование canonical query: `/` → `%2F`, сортировка по закодированному ключу, при равных ключах — по значению (`botocore-auth.py:268`)
+- [x] **M-12** Формат метки времени `yyyyMMdd'T'HHmmss'Z'` из `kotlin.time.Instant` без `kotlinx-datetime` ([факт 1.7](docs/research/research-architecture.md)); тест на границу суток — дата в scope берётся из той же строки, а не считается отдельно
+- [x] **M-13** `S3Config`: endpoint, регион, стиль адресации (path-style / virtual-hosted, [Открытый вопрос 3](docs/research/research-architecture.md)), учётные данные, `Clock`
+- [x] **M-14** Вывод `host` из URL: нижний регистр, дефолтный порт отбрасывается, нестандартный остаётся (`botocore-auth.py:81`)
+- [x] **M-15** Модель ошибок: `S3Exception` с кодом S3 **или** без него, статусом, `x-amz-request-id`, `x-amz-id-2` ([Риск 7](docs/research/research-architecture.md))
+
+**Итог M1.** Пять находок, из которых две изменили форму типов, а не только реализацию.
+
+**`%` в имени теста ломает Kotlin/Native** — «Name contains illegal characters», ровно как запятая
+(про которую уже было написано в `CONTRIBUTING.md`), и ровно так же JVM это компилирует. Поймалось
+на первом же тесте вехи, `encodes a space as %20 and never as plus`. Правило в `CONTRIBUTING.md`
+расширено: в именах тестов только буквы, цифры, пробелы и дефисы.
+
+**Метка времени стала типом, а не строкой.** `SigningTimestamp` — value class, у которого
+`scopeDate` это `amzDate.substring(0, 8)`. Дисциплина «не забудь взять дату из той же строки»
+работает 86 399 секунд в сутки; на последней она отказывает, и запрос, подписанный в
+`20150830T235959Z` со scope `20150831`, отвергается без объяснений. Substring вместо второго
+вычисления делает эту ошибку непредставимой.
+
+**Порт сравнивается с дефолтом своей схемы, а не с числом.** 443 — дефолт для https и обычный порт
+для http; `if (port == 443) drop` молча выкидывает его из `host` для `http://example.com:443` и
+даёт `SignatureDoesNotMatch`. Обе комбинации закреплены тестом.
+
+**`S3Credentials` намеренно не data class.** Сгенерированный `toString` положил бы секретный ключ
+в каждую строчку лога, где печатается конфиг, и заметил бы это не автор, а тот, кто читает логи.
+`toString` написан руками и печатает `secretAccessKey=***`; на это есть тест — и на `S3Config`
+тоже, потому что он печатает креды внутри себя.
+
+**Календаря в stdlib нет.** `kotlin.time.Instant` отдаёт только эпоху, поэтому разложение в дату —
+свои 15 строк (`civil_from_days` Хиннанта). Тесты на 1969 год и 29 февраля стоят там не для
+полноты: наивные `/` и `%` вместо `floorDiv` и `mod` ломаются ровно на отрицательной эпохе.
+
+**GATE закрыт.** `./gradlew build --rerun-tasks --no-build-cache` зелёный на Linux: 57 тестов
+(`:s3-core` — 54, `:s3-testing` — 3) выполнились на `linuxX64` и на `jvm`. Те же 57 зелёные на
+`macosArm64`, прогнанные на macOS-хосте. `ktlintCheck` чист.
 
 ## M2 — `:s3-sigv4`: ядро подписи на официальных векторах
 
