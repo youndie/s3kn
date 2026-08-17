@@ -21,7 +21,49 @@ public class SigV4TestCase internal constructor(
     public val request: String,
     /** Contents of `<case>.creq` — the canonical request the signer is expected to produce. */
     public val canonicalRequest: String,
-)
+    /** Contents of `<case>.sts` — the expected string to sign. */
+    public val stringToSign: String,
+    /** Contents of `<case>.authz` — the expected `Authorization` header. */
+    public val authorization: String,
+) {
+    private val parsed = parseHttpRequest(request)
+
+    /** Request method, upper-case as sent. */
+    public val method: String get() = parsed.method
+
+    /** Request path, still percent-encoded exactly as it appeared on the request line. */
+    public val path: String get() = parsed.path
+
+    /** Query parameters, decoded, in the order sent and with repeated names kept. */
+    public val query: List<Pair<String, String>> get() = parsed.query
+
+    /** Headers in the order sent, with folded values joined but spacing otherwise untouched. */
+    public val headers: List<Pair<String, String>> get() = parsed.headers
+
+    /** Request body, empty when the request had none. */
+    public val body: String get() = parsed.body
+
+    /**
+     * The session token the credentials of this case carry, or `null` when they carry none.
+     *
+     * Read out of the **expected** canonical request, which is circular and is what the reference
+     * implementation does (`botocore/tests/unit/auth/test_sigv4.py`, `SignatureTestCase`). There is
+     * no alternative: the two cases that carry a token carry different ones, and
+     * `post-sts-token/post-sts-header-after` deliberately has credentials whose token is never
+     * signed — a fact that exists nowhere but in the expected output.
+     */
+    public val sessionToken: String? =
+        canonicalRequest
+            .lineSequence()
+            .firstOrNull { it.startsWith(TOKEN_HEADER_PREFIX) }
+            ?.removePrefix(TOKEN_HEADER_PREFIX)
+
+    override fun toString(): String = "SigV4TestCase($name)"
+
+    private companion object {
+        const val TOKEN_HEADER_PREFIX = "x-amz-security-token:"
+    }
+}
 
 /**
  * Loader for the vendored test vectors.
@@ -40,6 +82,12 @@ public object SigV4TestSuite {
     private val root: Path = Path(SPEC_PATH, "aws-sig-v4-test-suite")
 
     /**
+     * Every case in the suite, sorted, with nested ones named by their relative path
+     * (`normalize-path/get-space`). A case is a directory holding a `<basename>.req`.
+     */
+    public fun caseNames(): List<String> = collectCaseNames(root, prefix = "").sorted()
+
+    /**
      * Loads a case by its name, which may contain a directory: `get-vanilla`,
      * `normalize-path/get-slash`. The file basename is the last segment of the name.
      */
@@ -50,8 +98,28 @@ public object SigV4TestSuite {
             name = name,
             request = read(Path(directory, "$basename.req")),
             canonicalRequest = read(Path(directory, "$basename.creq")),
+            stringToSign = read(Path(directory, "$basename.sts")),
+            authorization = read(Path(directory, "$basename.authz")),
         )
     }
+
+    private fun collectCaseNames(
+        directory: Path,
+        prefix: String,
+    ): List<String> =
+        SystemFileSystem.list(directory).flatMap { entry ->
+            val metadata = SystemFileSystem.metadataOrNull(entry)
+            if (metadata?.isDirectory != true) {
+                return@flatMap emptyList()
+            }
+            val name = entry.name
+            val qualified = if (prefix.isEmpty()) name else "$prefix/$name"
+            if (SystemFileSystem.exists(Path(entry, "$name.req"))) {
+                listOf(qualified)
+            } else {
+                collectCaseNames(entry, qualified)
+            }
+        }
 
     private fun read(path: Path): String {
         if (!SystemFileSystem.exists(path)) {

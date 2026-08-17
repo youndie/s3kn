@@ -2,8 +2,8 @@
 
 An S3 client for Kotlin/Native. First target: `linuxX64`.
 
-**Status: M1 done — key encoding, canonical query, signing timestamp, config and the error model.
-No requests are sent yet.**
+**Status: M2 done — the SigV4 signer passes all 34 official AWS test vectors. No requests are sent
+yet.**
 
 Scope of v1: `put`, `get`, `delete`, `head`, `list`, multipart upload, presigned URLs.
 
