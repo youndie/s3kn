@@ -1,6 +1,7 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
+    id("s3kn.publish")
     id("org.jetbrains.kotlin.multiplatform")
 }
 

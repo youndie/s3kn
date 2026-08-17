@@ -2,7 +2,14 @@ plugins {
     id("s3kn.kmp")
 }
 
-// Fixtures: the loader for the vendored AWS test vectors, and later the harness around MinIO.
+// Fixtures: the loader for the vendored test vectors, and the switches the live tests read.
+//
+// Deliberately not published. Its loaders find the vectors through an absolute path baked in at
+// build time, so outside a checkout of this repository they point at a directory that does not
+// exist. A published artefact that cannot work anywhere but here would be worse than none.
+tasks.withType<AbstractPublishToMaven>().configureEach {
+    enabled = false
+}
 
 /**
  * Writes the absolute path of `docs/spec` into a generated Kotlin source.

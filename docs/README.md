@@ -29,7 +29,16 @@
   подпись, семь операций, ошибки. По нему пишутся тесты.
 - [spec/README.md](spec/README.md) — что лежит в `spec/`, откуда взято, под какой лицензией
   и как на это ссылаться из тестов.
+- [services/s3-core.md](services/s3-core.md) — модель, кодирование, конфигурация; без зависимостей.
+- [services/s3-sigv4.md](services/s3-sigv4.md) — подпись и presign; без сети и без движка.
+- [services/s3-client.md](services/s3-client.md) — семь операций поверх `HttpClient`.
+- [services/s3-testing.md](services/s3-testing.md) — векторы и переключатели тестов; не публикуется.
+- [features/feature-object-io.md](features/feature-object-io.md) — put / get / head / delete.
+- [features/feature-listing.md](features/feature-listing.md) — перечисление бакета.
+- [features/feature-multipart.md](features/feature-multipart.md) — многочастная загрузка.
+- [features/feature-presign.md](features/feature-presign.md) — подписанные ссылки.
 - [../BACKLOG.md](../BACKLOG.md) — вехи M0…M8 и задачи `M-NN`.
+- [../RELEASING.md](../RELEASING.md) — что публикуется, куда и почему одним заданием.
 
 ## Карта покрытия
 
@@ -37,22 +46,19 @@
 - [x] [research-architecture](research/research-architecture.md)
 
 ### Protocol (1/1)
-- [x] [protocol-s3](api/protocol-s3.md) — **целиком целевое**: кода в репозитории пока нет
+- [x] [protocol-s3](api/protocol-s3.md) — закрыт целиком, все семь операций проверены живыми запросами
 
-### Features (0)
-- [ ] `feature-object-io` — put / get / delete / head, появится с M5
-- [ ] `feature-listing` — M6
-- [ ] `feature-multipart` — M7
-- [ ] `feature-presign` — M3
+### Features (4/4)
+- [x] [feature-object-io](features/feature-object-io.md) — put / get / head / delete
+- [x] [feature-listing](features/feature-listing.md) — перечисление бакета
+- [x] [feature-multipart](features/feature-multipart.md) — многочастная загрузка
+- [x] [feature-presign](features/feature-presign.md) — подписанные ссылки
 
-### Modules (0/4)
-- [ ] `s3-core` — модель, кодирование ключа, XML; появится с M1
-- [ ] `s3-sigv4` — подпись и presign; M2
-- [ ] `s3-client` — семь операций поверх `HttpClient`; M4
-- [ ] `s3-testing` — фикстуры и обвязка над MinIO; M4
-
-Пустые строчки здесь стоят намеренно: `features/` и `services/` описывают **существующий** код,
-а его пока нет. Документ слоя заводится в той же вехе, где появляется то, что он описывает.
+### Modules (4/4)
+- [x] [s3-core](services/s3-core.md) — модель, кодирование, конфигурация
+- [x] [s3-sigv4](services/s3-sigv4.md) — подпись и presign
+- [x] [s3-client](services/s3-client.md) — семь операций поверх `HttpClient`
+- [x] [s3-testing](services/s3-testing.md) — векторы и переключатели; **не публикуется**
 
 ## Соглашения
 
