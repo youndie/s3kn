@@ -34,13 +34,24 @@ class S3ClientRequestTest {
         }
 
     @Test
-    fun `leaves a dot segment in the path alone`() =
+    fun `leaves repeated slashes in the path alone`() =
         runTest {
-            // S3 signs the path verbatim, so a URL builder that normalises `/./` away sends a path
+            // S3 signs the path verbatim, so a URL builder that collapsed `//` would send a path
             // the signature was not computed over.
-            val request = capture(key = "a/./b//c")
+            val request = capture(key = "a//b")
 
-            assertEquals("/a/./b//c", request.url.encodedPath)
+            assertEquals("/a//b", request.url.encodedPath)
+        }
+
+    @Test
+    fun `refuses a key with a dot segment rather than sending one that cannot arrive`() =
+        runTest {
+            // Not a limitation of this library's encoding — it encodes such a key correctly — but
+            // of what happens below it: the HTTP client strips the segment after signing, and the
+            // request is rejected for a reason that names nothing (research, fact 1.9).
+            val client = client(MockEngine { respond(content = "") })
+
+            assertFailsWith<IllegalArgumentException> { client.head("photos", "a/./b") }
         }
 
     @Test

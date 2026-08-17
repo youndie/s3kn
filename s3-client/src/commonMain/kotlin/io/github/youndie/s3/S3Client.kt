@@ -1,15 +1,21 @@
 package io.github.youndie.s3
 
 import io.github.youndie.s3.sigv4.S3Operation
+import io.github.youndie.s3.sigv4.S3Payload
 import io.github.youndie.s3.sigv4.S3Signer
 import io.github.youndie.s3.sigv4.SignedS3Request
 import io.ktor.client.HttpClient
+import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.header
+import io.ktor.client.request.prepareRequest
 import io.ktor.client.request.request
+import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
+import io.ktor.client.statement.bodyAsChannel
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpMethod
 import io.ktor.http.isSuccess
+import io.ktor.utils.io.ByteReadChannel
 
 /**
  * What `HEAD` reports about an object.
@@ -25,6 +31,20 @@ public class S3ObjectMetadata(
     public val contentType: String?,
     /** `x-amz-meta-*` headers, with the prefix stripped and names lower-cased. */
     public val userMetadata: Map<String, String>,
+)
+
+/** An object being read, valid only while the block that received it is running. */
+public class S3Object(
+    public val contentLength: Long?,
+    public val contentType: String?,
+    public val eTag: String?,
+    /**
+     * The body, streamed.
+     *
+     * Live only inside the `get` block: once it returns, the connection is released and the
+     * channel is closed. Anything that must outlive the call has to be copied out of it.
+     */
+    public val body: ByteReadChannel,
 )
 
 /**
@@ -72,6 +92,128 @@ public class S3Client(
     }
 
     /**
+     * Stores an object whose body is already in memory.
+     *
+     * The body is hashed, so the signature covers it.
+     *
+     * @return the `ETag` S3 assigned, quoted as it arrives.
+     */
+    public suspend fun put(
+        bucket: String,
+        key: String,
+        body: ByteArray,
+        contentType: String? = null,
+    ): String? {
+        val response =
+            execute(
+                S3Operation(
+                    method = "PUT",
+                    bucket = bucket,
+                    key = key,
+                    headers = contentTypeHeader(contentType),
+                    payload = S3Payload.InMemory(body),
+                ),
+            ) { setBody(body) }
+        return response.headers["ETag"]
+    }
+
+    /**
+     * Stores an object whose body is streamed.
+     *
+     * [contentLength] is required and not a convenience. Without it the engine falls back to
+     * chunked transfer encoding, and S3 answers `411 MissingContentLength`
+     * (docs/spec/s3-service-2.json:4768). That failure appears only with a real stream, never with
+     * a `ByteArray`, so an optional parameter would hide it until production.
+     *
+     * The body cannot be hashed before it is read, so it is signed as `UNSIGNED-PAYLOAD`. Over
+     * plain HTTP that is refused unless the configuration allows it.
+     */
+    public suspend fun put(
+        bucket: String,
+        key: String,
+        body: ByteReadChannel,
+        contentLength: Long,
+        contentType: String? = null,
+    ): String? {
+        require(contentLength >= 0) { "Content length must not be negative, got $contentLength" }
+        val response =
+            execute(
+                S3Operation(
+                    method = "PUT",
+                    bucket = bucket,
+                    key = key,
+                    headers = contentTypeHeader(contentType),
+                    payload = S3Payload.Streamed,
+                ),
+            ) {
+                header("Content-Length", contentLength.toString())
+                setBody(body)
+            }
+        return response.headers["ETag"]
+    }
+
+    /**
+     * Reads an object, handing its body to [consume] as a stream.
+     *
+     * The body is never held whole in memory: a five-gigabyte object is read as it arrives. That is
+     * also why the channel is valid only inside [consume] — the connection is released when it
+     * returns.
+     *
+     * @param range byte range to read; the response is then `206 Partial Content`.
+     */
+    public suspend fun <T> get(
+        bucket: String,
+        key: String,
+        range: LongRange? = null,
+        consume: suspend (S3Object) -> T,
+    ): T {
+        val signed =
+            signer.sign(
+                S3Operation(
+                    method = "GET",
+                    bucket = bucket,
+                    key = key,
+                    headers = range?.let { listOf("Range" to "bytes=${it.first}-${it.last}") } ?: emptyList(),
+                ),
+            )
+
+        return http
+            .prepareRequest(signed.url) {
+                method = HttpMethod.Get
+                signed.headers.forEach { (name, value) -> header(name, value) }
+            }.execute { response ->
+                if (!response.status.isSuccess()) {
+                    throw errorFrom(response, "GET", signed)
+                }
+                consume(
+                    S3Object(
+                        contentLength = response.headers["Content-Length"]?.toLongOrNull(),
+                        contentType = response.headers["Content-Type"],
+                        eTag = response.headers["ETag"],
+                        body = response.bodyAsChannel(),
+                    ),
+                )
+            }
+    }
+
+    /**
+     * Removes an object.
+     *
+     * Removing something that is not there succeeds. That is S3's behaviour rather than an
+     * oversight here: the operation means "make sure this key is gone"
+     * (docs/api/protocol-s3.md, section 4.3).
+     */
+    public suspend fun delete(
+        bucket: String,
+        key: String,
+    ) {
+        execute(S3Operation(method = "DELETE", bucket = bucket, key = key))
+    }
+
+    private fun contentTypeHeader(contentType: String?): List<Pair<String, String>> =
+        contentType?.let { listOf("Content-Type" to it) } ?: emptyList()
+
+    /**
      * Signs the operation, sends it, and turns anything that is not a success into [S3Exception].
      *
      * The URL handed to Ktor is the one the signature was computed over, string for string. Ktor
@@ -81,28 +223,32 @@ public class S3Client(
      * and would break it as `SignatureDoesNotMatch`, which names no encoding
      * (docs/research/research-architecture.md, decision R4).
      */
-    private suspend fun execute(operation: S3Operation): HttpResponse {
+    private suspend fun execute(
+        operation: S3Operation,
+        configure: HttpRequestBuilder.() -> Unit = {},
+    ): HttpResponse {
         val signed = signer.sign(operation)
         val response =
             http.request(signed.url) {
                 method = HttpMethod.parse(operation.method)
                 signed.headers.forEach { (name, value) -> header(name, value) }
+                configure()
             }
 
         if (!response.status.isSuccess()) {
-            throw errorFrom(response, operation, signed)
+            throw errorFrom(response, operation.method, signed)
         }
         return response
     }
 
     private suspend fun errorFrom(
         response: HttpResponse,
-        operation: S3Operation,
+        method: String,
         signed: SignedS3Request,
     ): S3Exception {
         // A HEAD response has no body by definition. Asking for one anyway is not an error, but
         // there is nothing to gain and a stalled read to lose.
-        val error = if (operation.method == "HEAD") null else parseErrorBody(response.bodyAsText())
+        val error = if (method == "HEAD") null else parseErrorBody(response.bodyAsText())
 
         return S3Exception(
             status = response.status.value,

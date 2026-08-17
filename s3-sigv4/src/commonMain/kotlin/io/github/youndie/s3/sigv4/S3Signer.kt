@@ -29,7 +29,7 @@ public sealed interface S3Payload {
      *
      * Signed as `UNSIGNED-PAYLOAD`, which S3 permits and which is the only alternative to reading
      * the whole body into memory first (docs/research/research-architecture.md, decision R6).
-     * Allowed over HTTPS only.
+     * Over plain HTTP it is refused unless `allowUnsignedPayloadOverHttp` says otherwise.
      */
     public data object Streamed : S3Payload
 }
@@ -89,6 +89,7 @@ public class S3Signer(
 
     /** Signs a request with headers, the way an ordinary API call is authenticated. */
     public fun sign(operation: S3Operation): SignedS3Request {
+        requireUsableKey(operation.key)
         val timestamp = config.clock.now().toSigningTimestamp()
         val payloadHash = contentSha256(operation.payload)
         val path = config.encodedPathFor(operation.bucket, operation.key)
@@ -144,6 +145,7 @@ public class S3Signer(
         expires: Duration = 1.hours,
         query: List<Pair<String, String>> = emptyList(),
     ): String {
+        requireUsableKey(key)
         require(expires > Duration.ZERO) { "Presigned URL expiry must be positive, got $expires" }
         require(expires <= MAX_EXPIRY) {
             "Presigned URL expiry must be at most $MAX_EXPIRY (604800 seconds), got $expires"
@@ -211,14 +213,37 @@ public class S3Signer(
             }
 
             S3Payload.Streamed -> {
-                require(config.endpoint.isSecure) {
+                require(config.endpoint.isSecure || config.allowUnsignedPayloadOverHttp) {
                     "Refusing to send a streamed body over http with an unsigned payload: without " +
-                        "TLS nothing protects it in transit. Use https, or pass the body as " +
-                        "S3Payload.InMemory so it can be hashed."
+                        "TLS nothing protects it in transit. Use https, pass the body as " +
+                        "S3Payload.InMemory so it can be hashed, or set " +
+                        "allowUnsignedPayloadOverHttp on the config if the network is trusted."
                 }
                 UNSIGNED_PAYLOAD
             }
         }
+
+    /**
+     * Refuses a key whose path contains a `.` or `..` segment.
+     *
+     * Such a key is signed correctly and then never arrives: libcurl normalises the segment away
+     * before sending and the engine gives no way to stop it, so the server checks the signature
+     * against a path that was never sent (docs/research/research-architecture.md, fact 1.9). A
+     * browser following a presigned link does the same. S3 itself accepts these keys and the JVM
+     * engines deliver them, but a library that lets its primary target fail with
+     * `SignatureDoesNotMatch` and no explanation is worse than one that says no.
+     *
+     * Only a whole segment counts. `.hidden`, `file.txt` and `..trailer` are ordinary names.
+     */
+    private fun requireUsableKey(key: String) {
+        val offending = key.split('/').firstOrNull { it == "." || it == ".." } ?: return
+        throw IllegalArgumentException(
+            "Object key \"$key\" contains a \"$offending\" path segment and cannot be used: the " +
+                "HTTP client removes such segments from the path after the request is signed, so " +
+                "the server would check the signature against a different path and reject it " +
+                "without saying why.",
+        )
+    }
 
     private fun encodePair(
         name: String,

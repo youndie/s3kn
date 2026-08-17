@@ -52,6 +52,18 @@ public class S3Config(
     public val credentials: S3Credentials,
     public val addressingStyle: AddressingStyle = AddressingStyle.VIRTUAL_HOSTED,
     public val clock: Clock = Clock.System,
+    /**
+     * Whether a streamed body may be sent over plain HTTP with `UNSIGNED-PAYLOAD`.
+     *
+     * A stream cannot be hashed without reading it all first, so its signature covers the headers
+     * only. Over HTTPS that is fine — TLS protects the body. Over plain HTTP nothing does, and
+     * anything could be substituted in transit, so this is refused by default.
+     *
+     * It is a real option rather than a hole for tests: a local MinIO over HTTP is the ordinary
+     * development setup, and refusing every large upload there would make the library unusable in
+     * it. Turning it on states the choice; leaving it off means nobody makes it by accident.
+     */
+    public val allowUnsignedPayloadOverHttp: Boolean = false,
 ) {
     init {
         require(region.isNotBlank()) { "Region must not be blank: it is part of the credential scope" }

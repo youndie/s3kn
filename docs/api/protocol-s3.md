@@ -15,11 +15,10 @@ research: research-architecture
 реализация подписи (`reference/botocore-auth.py`), векторы (`aws-sig-v4-test-suite/`). Ссылка
 вида `s3-service-2.json:1596` указывает на строку в копии.
 
-Статус реализации: закрыты разделы 1–3 целиком — адресация и построение пути в `:s3-core`,
-подпись и presign в `:s3-sigv4` — и раздел 4.4 (`head`) в `:s3-client`. Приёмка: 34 официальных
-вектора для общего SigV4, 20 сгенерированных из botocore для правил S3 и presign
-(`docs/spec/s3-signing-vectors/`), плюс живые запросы к MinIO из `docker-compose.yml`.
-Разделы 4.1–4.3, 4.5, 4.6 и 5 — целевые: код под ними появится в M5–M7.
+Статус реализации: закрыты разделы 1–3, 4.1–4.4 и 5. Открыты 4.5 (`list`) и 4.6 (multipart) —
+целевые, код под ними появится в M6 и M7. Приёмка: 34 официальных вектора для общего SigV4,
+20 сгенерированных из botocore для правил S3 и presign (`docs/spec/s3-signing-vectors/`), плюс
+живые запросы к MinIO из `docker-compose.yml`.
 
 ---
 
@@ -189,8 +188,12 @@ x-amz-content-sha256: UNSIGNED-PAYLOAD | <hex>
 
 `s3-service-2.json:1353`. Успех — `200 OK`, `ETag` в заголовке ответа.
 
-`Content-Length` обязателен: без него libcurl уйдёт в chunked, а S3 ответит
-`411 MissingContentLength` (`s3-service-2.json:4768`, ресёрч, следствие 1.6.1).
+`Content-Length` обязателен: без него libcurl уйдёт в chunked, а сервер ответит
+`411 MissingContentLength` (`s3-service-2.json:4768`, ресёрч, следствие 1.6.1). Это не цитата из
+модели, а наблюдение: тест шлёт тело без длины через presign-ссылку и получает такой ответ от
+MinIO (`S3ClientE2eTest`).
+
+Поэтому длина — обязательный параметр `put`, а не поле со значением по умолчанию.
 
 ### 4.2 get
 

@@ -7,7 +7,10 @@ import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.isSuccess
+import io.ktor.utils.io.ByteReadChannel
+import io.ktor.utils.io.readRemaining
 import kotlinx.coroutines.test.runTest
+import kotlinx.io.readByteArray
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -23,8 +26,8 @@ import kotlin.time.Duration.Companion.minutes
  * an error that has no body. Until it passes, a failure anywhere else is indistinguishable from a
  * signing bug.
  *
- * Objects are put in place through presigned URLs rather than through the client, because `put`
- * does not exist yet — which makes the presigning of M3 load-bearing rather than decorative.
+ * Some objects are put in place through presigned URLs rather than through `put`, which keeps the
+ * presigning exercised by something other than a test written for it.
  *
  * Run against MinIO from `docker-compose.yml`:
  *
@@ -137,6 +140,115 @@ class S3ClientE2eTest {
             assertNotNull(parsed?.requestId, body)
         }
 
+    @Test
+    fun `stores an object and reads it back`() =
+        runTest {
+            val fixture = fixture() ?: return@runTest
+            val key = "e2e/put-get.txt"
+
+            val eTag = fixture.client.put(E2E.bucket, key, "stored by put".encodeToByteArray(), "text/plain")
+            val body = fixture.client.get(E2E.bucket, key) { it.body.readRemaining().readByteArray() }
+
+            assertNotNull(eTag)
+            assertEquals("stored by put", body.decodeToString())
+            assertEquals("text/plain", fixture.client.head(E2E.bucket, key).contentType)
+        }
+
+    @Test
+    fun `stores an object streamed with a stated length`() =
+        runTest {
+            // The path that matters for large objects, and the one that cannot be checked with a
+            // ByteArray: the body is signed as UNSIGNED-PAYLOAD and the length has to be stated,
+            // or the engine falls back to chunked and S3 answers 411.
+            val fixture = fixture() ?: return@runTest
+            val key = "e2e/streamed.bin"
+            val body = "streamed through a channel"
+
+            fixture.client.put(
+                bucket = E2E.bucket,
+                key = key,
+                body = ByteReadChannel(body),
+                contentLength = body.encodeToByteArray().size.toLong(),
+            )
+
+            assertEquals(
+                body,
+                fixture.client
+                    .get(E2E.bucket, key) { it.body.readRemaining().readByteArray() }
+                    .decodeToString(),
+            )
+        }
+
+    @Test
+    fun `reads part of an object with a range`() =
+        runTest {
+            val fixture = fixture() ?: return@runTest
+            val key = "e2e/ranged.txt"
+            fixture.client.put(E2E.bucket, key, "0123456789".encodeToByteArray())
+
+            val part =
+                fixture.client.get(E2E.bucket, key, range = 2L..5L) {
+                    it.body.readRemaining().readByteArray()
+                }
+
+            assertEquals("2345", part.decodeToString())
+        }
+
+    @Test
+    fun `names the error of a get that found nothing`() =
+        runTest {
+            // Unlike HEAD, a failed GET carries a body, so this is where the error code comes from.
+            val fixture = fixture() ?: return@runTest
+
+            val failure =
+                assertFailsWith<S3Exception> {
+                    fixture.client.get(E2E.bucket, "e2e/definitely-missing") { it.contentLength }
+                }
+
+            assertEquals(404, failure.status)
+            assertEquals("NoSuchKey", failure.code)
+            assertNotNull(failure.errorMessage)
+            assertNotNull(failure.requestId)
+        }
+
+    @Test
+    fun `removes an object and then reports it gone`() =
+        runTest {
+            val fixture = fixture() ?: return@runTest
+            val key = "e2e/to-delete.txt"
+            fixture.client.put(E2E.bucket, key, "temporary".encodeToByteArray())
+
+            fixture.client.delete(E2E.bucket, key)
+
+            assertEquals(404, assertFailsWith<S3Exception> { fixture.client.head(E2E.bucket, key) }.status)
+        }
+
+    @Test
+    fun `treats removing something that is not there as success`() =
+        runTest {
+            // Contradicts the intuition that deleting a missing thing is an error, which is exactly
+            // why it is pinned down here (docs/api/protocol-s3.md, section 4.3).
+            val fixture = fixture() ?: return@runTest
+
+            fixture.client.delete(E2E.bucket, "e2e/never-existed")
+        }
+
+    @Test
+    fun `is answered with 411 when a body arrives without a stated length`() =
+        runTest {
+            // Why `contentLength` is a required parameter of `put` rather than a convenience. Sent
+            // here deliberately without one, through a presigned URL, so the server's own answer is
+            // on record instead of a claim quoted from the API model
+            // (docs/spec/s3-service-2.json:4768).
+            val fixture = fixture() ?: return@runTest
+            val url = fixture.signer.presign("PUT", E2E.bucket, "e2e/no-length.bin", expires = 5.minutes)
+
+            val response = fixture.http.put(url) { setBody(ByteReadChannel("no length stated")) }
+
+            assertEquals(411, response.status.value, response.bodyAsText())
+            assertEquals("MissingContentLength", parseErrorBody(response.bodyAsText())?.code)
+        }
+
     private class Fixture(
         val client: S3Client,
         val signer: S3Signer,
@@ -161,6 +273,10 @@ class S3ClientE2eTest {
                 credentials = S3Credentials(E2E.accessKey, E2E.secretKey),
                 // 127.0.0.1 cannot carry a bucket as a DNS label, so a local server is path-style.
                 addressingStyle = AddressingStyle.PATH,
+                // The local server speaks plain HTTP, and a streamed body cannot be hashed. Saying
+                // so is the point: the same setting is what a developer running MinIO needs, and it
+                // has to be stated rather than assumed.
+                allowUnsignedPayloadOverHttp = true,
             )
         val http = realHttpClient()
         return Fixture(S3Client(config, http), S3Signer(config), http)

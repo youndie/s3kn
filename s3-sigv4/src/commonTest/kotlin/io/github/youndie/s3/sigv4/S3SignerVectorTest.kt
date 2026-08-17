@@ -90,10 +90,25 @@ class S3SignerVectorTest {
     fun `keeps the path verbatim so a dot segment survives`() {
         // The whole reason PathMode exists. The generic signer turns `/a/./b` into `/a/b`; S3 must
         // not (docs/spec/reference/botocore-auth.py:538), and the vector says so independently.
+        //
+        // Checked through the low-level signer on purpose: S3Signer refuses such a key outright,
+        // because no HTTP client will deliver it (research, fact 1.9). The rule below is still the
+        // right one — it is what makes the refusal a deliberate choice rather than a bug.
         val vector = S3SigningVectors.headerCase("key-with-dot-segment")
+        val signed =
+            SigV4Signer("us-east-1", "s3", PathMode.VERBATIM).sign(
+                SigningRequest(
+                    method = "GET",
+                    path = "/a/./b",
+                    headers = listOf("Host" to "photos.s3.us-east-1.amazonaws.com"),
+                    payloadHash = EMPTY_PAYLOAD_SHA256,
+                ),
+                credentials(null),
+                fixedClock.now().toSigningTimestamp(),
+            )
 
         assertEquals("/a/./b", vector.canonicalRequest.lines()[1])
-        assertEquals("/a/./b", sign(vector).canonicalRequest.text.lines()[1])
+        assertEquals("/a/./b", signed.canonicalRequest.text.lines()[1])
     }
 
     @Test
@@ -124,7 +139,7 @@ class S3SignerVectorTest {
 
     private fun checkHeaderCases(produce: (S3HeaderVector, SignedS3Request) -> Pair<String, String>) {
         val failures =
-            S3SigningVectors.headerCaseNames().mapNotNull { name ->
+            S3SigningVectors.headerCaseNames().filterNot { it in REFUSED_KEYS }.mapNotNull { name ->
                 val vector = S3SigningVectors.headerCase(name)
                 val (actual, expected) = produce(vector, sign(vector))
                 if (actual == expected) {
@@ -189,6 +204,13 @@ class S3SignerVectorTest {
         headers.first { (given, _) -> given.lowercase() == name }.second
 
     private companion object {
+        /**
+         * Cases whose key S3Signer refuses to sign at all, because no HTTP client would deliver it
+         * (research, fact 1.9). The vectors stay: they are the evidence that the underlying rule is
+         * right, and the refusal is a decision on top of it, not a workaround for a bug.
+         */
+        val REFUSED_KEYS = setOf("key-with-dot-segment")
+
         val fixedClock =
             object : Clock {
                 override fun now(): Instant = Instant.fromEpochSeconds(1_440_938_160L)

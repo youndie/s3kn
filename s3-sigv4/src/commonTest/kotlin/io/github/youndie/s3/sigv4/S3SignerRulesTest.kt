@@ -54,14 +54,27 @@ class S3SignerRulesTest {
     @Test
     fun `refuses to leave a streamed body unsigned over plain http`() {
         // Without TLS the signature over the headers protects nothing about the body, and an
-        // unsigned payload would let anything be substituted in transit. Refusing is the only
-        // honest answer; silently buffering gigabytes would be the other option.
+        // unsigned payload would let anything be substituted in transit. Refusing by default is
+        // the only honest answer; silently buffering gigabytes would be the other option.
         val failure =
             assertFailsWith<IllegalArgumentException> {
                 signer(endpoint = "http://localhost:9000").sign(operation(payload = S3Payload.Streamed))
             }
 
         assertTrue("http" in failure.message.orEmpty(), failure.message.orEmpty())
+        assertTrue("allowUnsignedPayloadOverHttp" in failure.message.orEmpty(), failure.message.orEmpty())
+    }
+
+    @Test
+    fun `streams over plain http when the caller says it accepts that`() {
+        // Not a hole for tests to crawl through: a local MinIO over http is the ordinary
+        // development setup, and refusing every large upload there would make the library useless
+        // in it. The point is that the caller states the choice rather than not noticing it.
+        val signed =
+            signer(endpoint = "http://localhost:9000", allowUnsignedPayloadOverHttp = true)
+                .sign(operation(payload = S3Payload.Streamed))
+
+        assertEquals("UNSIGNED-PAYLOAD", signed.header("x-amz-content-sha256"))
     }
 
     @Test
@@ -74,6 +87,38 @@ class S3SignerRulesTest {
             "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
             signed.header("x-amz-content-sha256"),
         )
+    }
+
+    @Test
+    fun `refuses a key with a dot segment because it will not survive the trip`() {
+        // libcurl removes `.` and `..` from the path after this library has signed it, and the
+        // engine offers no way to stop it, so the request arrives signed for a path that was never
+        // sent (docs/research/research-architecture.md, fact 1.9). A browser following a presigned
+        // link does the same. Refusing here turns a bare SignatureDoesNotMatch into a sentence
+        // that says what is wrong.
+        val signer = signer()
+
+        val failure =
+            assertFailsWith<IllegalArgumentException> {
+                signer.sign(S3Operation(method = "GET", bucket = "photos", key = "a/./b"))
+            }
+
+        assertTrue("a/./b" in failure.message.orEmpty(), failure.message.orEmpty())
+        assertFailsWith<IllegalArgumentException> {
+            signer.sign(S3Operation(method = "GET", bucket = "photos", key = "a/../b"))
+        }
+        assertFailsWith<IllegalArgumentException> { signer.presign("GET", "photos", "a/./b") }
+    }
+
+    @Test
+    fun `allows a dot that is part of a name rather than a whole segment`() {
+        // `.hidden`, `file.txt` and `..trailer` are ordinary names. Only a segment that is exactly
+        // `.` or `..` is a path operator.
+        val signer = signer()
+
+        signer.sign(S3Operation(method = "GET", bucket = "photos", key = ".hidden"))
+        signer.sign(S3Operation(method = "GET", bucket = "photos", key = "a/..trailer/b"))
+        signer.sign(S3Operation(method = "GET", bucket = "photos", key = "a/b../c"))
     }
 
     @Test
@@ -137,6 +182,7 @@ class S3SignerRulesTest {
     private fun signer(
         endpoint: String = "https://s3.us-east-1.amazonaws.com",
         style: AddressingStyle = AddressingStyle.VIRTUAL_HOSTED,
+        allowUnsignedPayloadOverHttp: Boolean = false,
     ): S3Signer =
         S3Signer(
             S3Config(
@@ -145,6 +191,7 @@ class S3SignerRulesTest {
                 credentials = S3Credentials("AKIDEXAMPLE", "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY"),
                 addressingStyle = style,
                 clock = fixedClock,
+                allowUnsignedPayloadOverHttp = allowUnsignedPayloadOverHttp,
             ),
         )
 
