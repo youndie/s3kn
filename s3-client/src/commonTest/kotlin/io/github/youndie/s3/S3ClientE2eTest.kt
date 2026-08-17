@@ -32,7 +32,8 @@ import kotlin.time.Duration.Companion.minutes
  *
  * Run against MinIO from `docker-compose.yml`:
  *
- *     docker compose up -d --wait
+ *     docker compose up -d --wait minio
+ *     docker compose run --rm create-buckets
  *     S3_E2E_ENDPOINT=http://127.0.0.1:9000 ./gradlew :s3-client:linuxX64Test
  *
  * Without `S3_E2E_ENDPOINT` these skip. In CI `S3_E2E_REQUIRED=1` turns a missing endpoint into a

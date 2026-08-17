@@ -110,7 +110,8 @@ Requires JDK 25; Gradle arrives through the wrapper.
 The protocol tests need an S3 server:
 
 ```bash
-docker compose up -d --wait
+docker compose up -d --wait minio
+docker compose run --rm create-buckets
 S3_E2E_ENDPOINT=http://127.0.0.1:9000 ./gradlew build
 ```
 

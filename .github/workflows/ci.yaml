@@ -34,8 +34,12 @@ jobs:
 
       # docker-compose is the single source of truth for the test server. A service container would
       # duplicate it here and drift from what a developer runs locally.
+      # Two steps: `up --wait` counts a service that exited as a failure, even on exit zero, so a
+      # one-shot bucket creator would fail the job while doing its job.
       - name: start MinIO
-        run: docker compose up -d --wait
+        run: |
+          docker compose up -d --wait minio
+          docker compose run --rm create-buckets
 
       - name: build
         run: ./gradlew build --stacktrace

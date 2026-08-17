@@ -9,8 +9,8 @@ package io.github.youndie.s3.testing
 public expect fun environmentVariable(name: String): String?
 
 /**
- * Endpoint of the S3 server the protocol tests run against — `docker compose up -d --wait` and
- * `S3_E2E_ENDPOINT=http://127.0.0.1:9000`.
+ * Endpoint of the S3 server the protocol tests run against — see `docker-compose.yml` for how to
+ * start it, then `S3_E2E_ENDPOINT=http://127.0.0.1:9000`.
  *
  * When it is unset the tests that need a server skip themselves, which is fine on a laptop and not
  * fine in CI: a skipped test reads exactly like a passing one. So CI sets `S3_E2E_REQUIRED=1`, and
@@ -39,7 +39,7 @@ public object E2E {
         val endpoint = endpoint
         check(!(endpoint == null && required)) {
             "S3_E2E_REQUIRED=1 but S3_E2E_ENDPOINT is unset: the tests that need a server would " +
-                "have been skipped without saying so. Start it with `docker compose up -d --wait`."
+                "have been skipped without saying so. See docker-compose.yml for how to start it."
         }
         return endpoint
     }

@@ -4,8 +4,14 @@
 # following it would neither give updates nor stay honest about what is being tested. Change the
 # tag deliberately, in its own commit, and re-run the whole suite.
 #
-#   docker compose up -d --wait
+#   docker compose up -d --wait minio
+#   docker compose run --rm create-buckets
 #   S3_E2E_ENDPOINT=http://127.0.0.1:9000 ./gradlew :s3-client:linuxX64Test
+#
+# Two steps, not `up --wait` on its own: `--wait` treats a service that has exited as a failure,
+# even when it exited zero, so a one-shot bucket creator makes the command return 1 while doing
+# exactly what it should. Waiting on `minio` alone and running the creator to completion says what
+# is meant and reports it honestly.
 services:
   minio:
     image: minio/minio:RELEASE.2025-09-07T16-13-09Z
@@ -26,7 +32,7 @@ services:
       start_period: 5s
 
   # Creates the buckets the tests expect. The library has no CreateBucket — it is out of the v1
-  # scope — so something else has to make them.
+  # scope — so something else has to make them. Started with `run`, not `up`: it is meant to exit.
   create-buckets:
     image: minio/mc:RELEASE.2025-08-13T08-35-41Z
     depends_on:

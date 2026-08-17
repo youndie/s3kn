@@ -25,7 +25,9 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
 
       - name: start MinIO
-        run: docker compose up -d --wait
+        run: |
+          docker compose up -d --wait minio
+          docker compose run --rm create-buckets
 
       # Nothing gets published that has not passed everything, including the live tests. A snapshot
       # is still something somebody will depend on.
