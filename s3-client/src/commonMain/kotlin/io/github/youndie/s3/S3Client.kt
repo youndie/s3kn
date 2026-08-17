@@ -16,8 +16,15 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpMethod
 import io.ktor.http.isSuccess
 import io.ktor.utils.io.ByteReadChannel
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.withContext
 
 /**
  * What `HEAD` reports about an object.
@@ -282,6 +289,183 @@ public class S3Client(
             } while (page.isTruncated && token != null)
         }
 
+    /**
+     * Starts a multipart upload.
+     *
+     * Nothing is stored until [completeMultipartUpload]; until then the parts already sent occupy
+     * storage and are billed, so a started upload has to end in a completion or an
+     * [abortMultipartUpload].
+     */
+    public suspend fun createMultipartUpload(
+        bucket: String,
+        key: String,
+        contentType: String? = null,
+    ): S3MultipartUpload {
+        val response =
+            execute(
+                S3Operation(
+                    method = "POST",
+                    bucket = bucket,
+                    key = key,
+                    query = listOf("uploads" to ""),
+                    headers = contentTypeHeader(contentType),
+                ),
+            )
+        return S3MultipartUpload(bucket, key, parseUploadId(response.bodyAsText()))
+    }
+
+    /** Uploads one part held in memory. */
+    public suspend fun uploadPart(
+        upload: S3MultipartUpload,
+        partNumber: Int,
+        body: ByteArray,
+    ): S3CompletedPart {
+        requirePartNumber(partNumber)
+        val response = execute(partOperation(upload, partNumber, S3Payload.InMemory(body))) { setBody(body) }
+        return completedPart(partNumber, response)
+    }
+
+    /** Uploads one part from a stream. As with [put], the length is required, not optional. */
+    public suspend fun uploadPart(
+        upload: S3MultipartUpload,
+        partNumber: Int,
+        body: ByteReadChannel,
+        contentLength: Long,
+    ): S3CompletedPart {
+        requirePartNumber(partNumber)
+        require(contentLength >= 0) { "Content length must not be negative, got $contentLength" }
+        val response =
+            execute(partOperation(upload, partNumber, S3Payload.Streamed)) {
+                header("Content-Length", contentLength.toString())
+                setBody(body)
+            }
+        return completedPart(partNumber, response)
+    }
+
+    /**
+     * Finishes a multipart upload, assembling the parts into one object.
+     *
+     * @return the object's `ETag`.
+     * @throws S3Exception when the assembly failed — **including when the status was `200`**. S3
+     *   answers before it knows the outcome, so the body decides
+     *   (docs/spec/s3-service-2.json:32).
+     */
+    public suspend fun completeMultipartUpload(
+        upload: S3MultipartUpload,
+        parts: List<S3CompletedPart>,
+    ): String? {
+        require(parts.isNotEmpty()) { "A multipart upload needs at least one part" }
+        val body = completeMultipartUploadBody(parts)
+        val response =
+            execute(
+                S3Operation(
+                    method = "POST",
+                    bucket = upload.bucket,
+                    key = upload.key,
+                    query = listOf("uploadId" to upload.uploadId),
+                    headers = listOf("Content-Type" to "application/xml"),
+                    payload = S3Payload.InMemory(body.encodeToByteArray()),
+                ),
+            ) { setBody(body.encodeToByteArray()) }
+        return parseCompleteMultipartUpload(response.bodyAsText())
+    }
+
+    /** Gives up on a multipart upload and releases the parts already stored. */
+    public suspend fun abortMultipartUpload(upload: S3MultipartUpload) {
+        execute(
+            S3Operation(
+                method = "DELETE",
+                bucket = upload.bucket,
+                key = upload.key,
+                query = listOf("uploadId" to upload.uploadId),
+            ),
+        )
+    }
+
+    /**
+     * Uploads a stream of unknown length as one object, in parts, several at a time.
+     *
+     * The stream is read one part ahead of what is being sent, so at most [concurrency] parts are
+     * held in memory at once — [partSize] × [concurrency] bytes, and no more, however large the
+     * object is.
+     *
+     * If anything fails or the caller is cancelled, the upload is aborted before the failure
+     * propagates. A multipart upload nobody finishes keeps its parts, and they are billed until
+     * somebody notices.
+     *
+     * @param partSize size of every part but the last; S3 requires at least
+     *   [S3MultipartLimits.MIN_PART_SIZE].
+     * @param concurrency how many parts to send at once.
+     */
+    public suspend fun putMultipart(
+        bucket: String,
+        key: String,
+        body: ByteReadChannel,
+        partSize: Long = DEFAULT_PART_SIZE,
+        concurrency: Int = DEFAULT_CONCURRENCY,
+        contentType: String? = null,
+    ): String? {
+        require(partSize >= S3MultipartLimits.MIN_PART_SIZE) {
+            "Part size must be at least ${S3MultipartLimits.MIN_PART_SIZE} bytes, got $partSize"
+        }
+        require(concurrency >= 1) { "Concurrency must be at least 1, got $concurrency" }
+
+        val upload = createMultipartUpload(bucket, key, contentType)
+        try {
+            val permits = Semaphore(concurrency)
+            val parts =
+                coroutineScope {
+                    val uploads = mutableListOf<kotlinx.coroutines.Deferred<S3CompletedPart>>()
+                    var partNumber = S3MultipartLimits.MIN_PART_NUMBER
+                    while (true) {
+                        // Read before taking a permit: reading is what decides whether there is
+                        // another part at all, and it is sequential either way.
+                        val chunk = body.readPart(partSize)
+                        if (chunk.isEmpty() && partNumber > S3MultipartLimits.MIN_PART_NUMBER) break
+                        requirePartNumber(partNumber)
+                        val number = partNumber++
+                        uploads += async { permits.withPermit { uploadPart(upload, number, chunk) } }
+                        if (chunk.size < partSize) break
+                    }
+                    uploads.awaitAll()
+                }
+            return completeMultipartUpload(upload, parts)
+        } catch (failure: Throwable) {
+            // NonCancellable because the usual reason to be here is cancellation, and an abort that
+            // is itself cancelled leaves exactly the parts it was meant to remove.
+            withContext(NonCancellable) { runCatching { abortMultipartUpload(upload) } }
+            throw failure
+        }
+    }
+
+    private fun partOperation(
+        upload: S3MultipartUpload,
+        partNumber: Int,
+        payload: S3Payload,
+    ): S3Operation =
+        S3Operation(
+            method = "PUT",
+            bucket = upload.bucket,
+            key = upload.key,
+            query = listOf("partNumber" to partNumber.toString(), "uploadId" to upload.uploadId),
+            payload = payload,
+        )
+
+    private fun completedPart(
+        partNumber: Int,
+        response: HttpResponse,
+    ): S3CompletedPart {
+        // The ETag of a part arrives as a header, not in a body — the response has none
+        // (docs/spec/s3-service-2.json, shapes.UploadPartOutput.members.ETag).
+        val eTag =
+            response.headers["ETag"]
+                ?: throw S3Exception(
+                    status = response.status.value,
+                    errorMessage = "Part $partNumber was stored without an ETag header, so it cannot be completed",
+                )
+        return S3CompletedPart(partNumber, eTag)
+    }
+
     private fun contentTypeHeader(contentType: String?): List<Pair<String, String>> =
         contentType?.let { listOf("Content-Type" to it) } ?: emptyList()
 
@@ -335,5 +519,9 @@ public class S3Client(
 
     private companion object {
         const val USER_METADATA_PREFIX = "x-amz-meta-"
+
+        /** Eight mebibytes: comfortably above the five-mebibyte floor, small enough to retry. */
+        const val DEFAULT_PART_SIZE = 8L * 1024 * 1024
+        const val DEFAULT_CONCURRENCY = 4
     }
 }

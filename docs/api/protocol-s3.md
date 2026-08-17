@@ -15,10 +15,9 @@ research: research-architecture
 реализация подписи (`reference/botocore-auth.py`), векторы (`aws-sig-v4-test-suite/`). Ссылка
 вида `s3-service-2.json:1596` указывает на строку в копии.
 
-Статус реализации: закрыты разделы 1–3, 4.1–4.5 и 5. Открыт только 4.6 (multipart) — целевой,
-код под ним появится в M7. Приёмка: 34 официальных вектора для общего SigV4,
-20 сгенерированных из botocore для правил S3 и presign (`docs/spec/s3-signing-vectors/`), плюс
-живые запросы к MinIO из `docker-compose.yml`.
+Статус реализации: закрыт весь документ — все семь операций v1 работают и проверены живыми
+запросами. Приёмка: 34 официальных вектора для общего SigV4, 20 сгенерированных из botocore для
+правил S3 и presign (`docs/spec/s3-signing-vectors/`), плюс MinIO из `docker-compose.yml`.
 
 ---
 
@@ -287,10 +286,14 @@ GET /<bucket>?list-type=2&encoding-type=url[&prefix=][&delimiter=][&max-keys=][&
 | все части кроме последней — не меньше минимального размера, иначе `EntityTooSmall` (400) | `s3-service-2.json:32` |
 | часть с уже использованным номером **перезаписывает** предыдущую | `s3-service-2.json:1604` |
 
-> **Минимальный размер части — 5 МиБ** — общеизвестная величина из
-> `docs.aws.amazon.com/AmazonS3/latest/userguide/qfacts.html`; в модели она не записана, модель
-> отсылает к этой странице. **Гипотеза, проверить в вехе multipart** тестом, который льёт две
-> части по 1 МиБ и ждёт `EntityTooSmall`.
+> **Минимальный размер части — 5 МиБ.** В модели этой величины нет, модель отсылает к
+> `docs.aws.amazon.com/AmazonS3/latest/userguide/qfacts.html`. Гипотеза закрыта живым запросом: две
+> части по 1 МиБ дают `EntityTooSmall` на `complete` (`S3MultipartE2eTest`). В коде это
+> `S3MultipartLimits.MIN_PART_SIZE`.
+
+**ETag многочастного объекта — не MD5 содержимого.** У него суффикс `-N` по числу частей, так что
+сравнение ETag с хешем содержимого перестаёт совпадать ровно тогда, когда загрузка становится
+многочастной.
 
 **Грабля `complete`.** «A 200 OK response can contain either a success or an error»
 (`s3-service-2.json:32`). Успех определяется **не статусом**, а корневым элементом тела:
