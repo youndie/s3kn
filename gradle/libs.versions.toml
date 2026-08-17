@@ -1,0 +1,37 @@
+[versions]
+kotlin = "2.4.10"
+kotlinxCoroutines = "1.11.0"
+kotlinxIo = "0.9.1"
+# The engine that carries HTTPS on Kotlin/Native lives here, and so does the OpenSSL it links
+# statically. Bumping this line bumps the TLS stack — see docs/research/research-architecture.md,
+# risk 1.
+ktor = "3.5.2"
+kotlincrypto = "0.8.0"
+# Pinned on purpose: ktlint is wired in as a CLI, without a wrapper plugin.
+ktlint = "1.8.0"
+
+[libraries]
+# Reading the vendored specification from a test. The only file API that exists on every target
+# this project declares.
+kotlinx-io-core = { module = "org.jetbrains.kotlinx:kotlinx-io-core", version.ref = "kotlinxIo" }
+
+# Turned on in M2, when the signer appears. Pure Kotlin, no cinterop —
+# docs/research/research-architecture.md, fact 1.2.
+kotlincrypto-hmac-sha2 = { module = "org.kotlincrypto.macs:hmac-sha2", version.ref = "kotlincrypto" }
+kotlincrypto-hash-sha2 = { module = "org.kotlincrypto.hash:sha2", version.ref = "kotlincrypto" }
+
+# Turned on in M4. The library depends on the client core only; the engine is the application's
+# choice, and on linuxX64 there is exactly one that speaks HTTPS — ktor-client-curl.
+ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
+ktor-client-mock = { module = "io.ktor:ktor-client-mock", version.ref = "ktor" }
+ktor-client-curl = { module = "io.ktor:ktor-client-curl", version.ref = "ktor" }
+
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutines" }
+kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinxCoroutines" }
+
+ktlint-cli = { module = "com.pinterest.ktlint:ktlint-cli", version.ref = "ktlint" }
+
+kotlin-gradlePlugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
+
+[plugins]
+kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
