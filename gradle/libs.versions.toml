@@ -15,16 +15,17 @@ ktlint = "1.8.0"
 # this project declares.
 kotlinx-io-core = { module = "org.jetbrains.kotlinx:kotlinx-io-core", version.ref = "kotlinxIo" }
 
-# Turned on in M2, when the signer appears. Pure Kotlin, no cinterop —
-# docs/research/research-architecture.md, fact 1.2.
+# Crypto for SigV4. Pure Kotlin, no cinterop — docs/research/research-architecture.md, fact 1.2.
 kotlincrypto-hmac-sha2 = { module = "org.kotlincrypto.macs:hmac-sha2", version.ref = "kotlincrypto" }
 kotlincrypto-hash-sha2 = { module = "org.kotlincrypto.hash:sha2", version.ref = "kotlincrypto" }
 
-# Turned on in M4. The library depends on the client core only; the engine is the application's
-# choice, and on linuxX64 there is exactly one that speaks HTTPS — ktor-client-curl.
+# The library depends on the client core only; the engine is the application's choice, and on
+# linuxX64 there is exactly one that speaks HTTPS — ktor-client-curl.
 ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
 ktor-client-mock = { module = "io.ktor:ktor-client-mock", version.ref = "ktor" }
 ktor-client-curl = { module = "io.ktor:ktor-client-curl", version.ref = "ktor" }
+# Test-only, JVM side: the native tests use curl, and curl does not exist on the JVM.
+ktor-client-cio = { module = "io.ktor:ktor-client-cio", version.ref = "ktor" }
 
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutines" }
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinxCoroutines" }

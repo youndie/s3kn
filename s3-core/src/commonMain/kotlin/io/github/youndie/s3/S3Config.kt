@@ -58,22 +58,24 @@ public class S3Config(
     }
 
     /**
-     * The `host` header for a request against this bucket.
+     * The host a request against this bucket goes to, without a port.
      *
-     * In [AddressingStyle.VIRTUAL_HOSTED] the bucket becomes a label in front of the endpoint host,
-     * and the port — when there is one — stays behind it.
+     * In [AddressingStyle.VIRTUAL_HOSTED] the bucket becomes a label in front of the endpoint host.
      */
-    public fun hostHeaderFor(bucket: String): String =
+    public fun requestHostFor(bucket: String): String =
         when (addressingStyle) {
-            AddressingStyle.PATH -> {
-                endpoint.hostHeader
-            }
-
-            AddressingStyle.VIRTUAL_HOSTED -> {
-                val host = "$bucket.${endpoint.host}"
-                if (endpoint.port == null) host else "$host:${endpoint.port}"
-            }
+            AddressingStyle.PATH -> endpoint.host
+            AddressingStyle.VIRTUAL_HOSTED -> "$bucket.${endpoint.host}"
         }
+
+    /**
+     * The `host` header for a request against this bucket: [requestHostFor] plus the port, when
+     * the port is not the scheme's default.
+     */
+    public fun hostHeaderFor(bucket: String): String {
+        val host = requestHostFor(bucket)
+        return if (endpoint.port == null) host else "$host:${endpoint.port}"
+    }
 
     /**
      * The path of a request against this bucket and key, already percent-encoded.

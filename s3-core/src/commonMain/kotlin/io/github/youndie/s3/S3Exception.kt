@@ -22,6 +22,17 @@ public class S3Exception(
     public val requestId: String? = null,
     /** `x-amz-id-2`. */
     public val extendedRequestId: String? = null,
+    /**
+     * The canonical request this library built and signed.
+     *
+     * Kept so that a `SignatureDoesNotMatch` can be diagnosed: S3 returns the canonical request it
+     * built in [serverCanonicalRequest], and comparing the two line by line names the disagreement
+     * immediately. Without them the response says only that the signature is wrong
+     * (docs/research/research-architecture.md, risk 4).
+     */
+    public val sentCanonicalRequest: String? = null,
+    /** The canonical request the server built, when it told us. */
+    public val serverCanonicalRequest: String? = null,
     cause: Throwable? = null,
 ) : RuntimeException(describe(status, code, errorMessage, requestId, extendedRequestId), cause) {
     init {

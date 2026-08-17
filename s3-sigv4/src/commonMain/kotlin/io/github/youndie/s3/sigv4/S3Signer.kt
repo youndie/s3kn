@@ -55,6 +55,16 @@ public class S3Operation(
 public class SignedS3Request internal constructor(
     /** The full URL, query included. */
     public val url: String,
+    /**
+     * The path, already percent-encoded, exactly as it was signed.
+     *
+     * Handed to the HTTP client as an *encoded* path. Anything that encodes it a second time —
+     * and a URL builder given a decoded path will — changes the string the server verifies the
+     * signature against, and the only symptom is `SignatureDoesNotMatch`.
+     */
+    public val encodedPath: String,
+    /** The query string, already percent-encoded and in canonical order; empty when there is none. */
+    public val encodedQuery: String,
     /** Every header to send, including `Authorization`. */
     public val headers: List<Pair<String, String>>,
     /** Kept for diagnostics: on `SignatureDoesNotMatch` this is what to compare against. */
@@ -107,6 +117,8 @@ public class S3Signer(
             url =
                 "${config.endpoint.scheme}://${config.hostHeaderFor(operation.bucket)}$path" +
                     if (query.isEmpty()) "" else "?$query",
+            encodedPath = path,
+            encodedQuery = query,
             headers = signed.headers + (AUTHORIZATION_HEADER to signed.authorization),
             canonicalRequest = signed.canonicalRequest,
             stringToSign = signed.stringToSign,

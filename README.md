@@ -2,8 +2,8 @@
 
 An S3 client for Kotlin/Native. First target: `linuxX64`.
 
-**Status: M3 done — signing and presigning are complete and checked against reference vectors.
-No requests are sent yet.**
+**Status: M4 done — the client sends its first requests. `head` and presigned URLs work against
+MinIO; `put`, `get`, `delete`, listing and multipart are next.**
 
 Scope of v1: `put`, `get`, `delete`, `head`, `list`, multipart upload, presigned URLs.
 
@@ -14,6 +14,16 @@ Requires JDK 25; Gradle arrives through the wrapper.
 ```bash
 ./gradlew build
 ```
+
+The protocol tests need an S3 server:
+
+```bash
+docker compose up -d --wait
+S3_E2E_ENDPOINT=http://127.0.0.1:9000 ./gradlew build
+```
+
+Without `S3_E2E_ENDPOINT` they skip themselves. CI sets `S3_E2E_REQUIRED=1` so that a missing
+server fails the build instead of quietly running nothing.
 
 `linuxX64` is the primary target and its tests do not run on macOS — the Kotlin Gradle plugin
 disables `linuxX64Test` on a non-Linux host. `macosArm64` is declared for the local loop, and CI
