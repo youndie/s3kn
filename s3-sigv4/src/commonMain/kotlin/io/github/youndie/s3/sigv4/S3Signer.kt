@@ -226,12 +226,16 @@ public class S3Signer(
     /**
      * Refuses a key whose path contains a `.` or `..` segment.
      *
-     * Such a key is signed correctly and then never arrives: libcurl normalises the segment away
-     * before sending and the engine gives no way to stop it, so the server checks the signature
-     * against a path that was never sent (docs/research/research-architecture.md, fact 1.9). A
-     * browser following a presigned link does the same. S3 itself accepts these keys and the JVM
-     * engines deliver them, but a library that lets its primary target fail with
-     * `SignatureDoesNotMatch` and no explanation is worse than one that says no.
+     * Such a key is signed correctly and then never arrives **through libcurl**, which normalises
+     * the segment away before sending; the engine gives no way to stop it, so the server checks the
+     * signature against a path that was never sent (docs/research/research-architecture.md, fact
+     * 1.9). A browser following a presigned link does the same.
+     *
+     * Measured, not assumed, and the measurement cuts both ways: NSURLSession and the JVM engines
+     * deliver such a path intact (fact 1.11), and S3 accepts these keys. So this refuses something
+     * that works on two engines of three. It is still the right trade — the signer cannot see which
+     * engine it will be handed, and a silent failure on the platform this library is built for is
+     * worse than a refusal everywhere (decision R13).
      *
      * Only a whole segment counts. `.hidden`, `file.txt` and `..trailer` are ordinary names.
      */
@@ -239,9 +243,11 @@ public class S3Signer(
         val offending = key.split('/').firstOrNull { it == "." || it == ".." } ?: return
         throw IllegalArgumentException(
             "Object key \"$key\" contains a \"$offending\" path segment and cannot be used: the " +
-                "HTTP client removes such segments from the path after the request is signed, so " +
-                "the server would check the signature against a different path and reject it " +
-                "without saying why.",
+                "curl engine — the only one that speaks HTTPS on Kotlin/Native — removes such " +
+                "segments from the path after the request is signed, so the server would check " +
+                "the signature against a different path and reject it without saying why. This is " +
+                "refused on every platform because the signer cannot see which engine it was " +
+                "given.",
         )
     }
 

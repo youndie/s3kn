@@ -20,11 +20,14 @@ kotlin {
             implementation(libs.ktor.client.mock)
             implementation(libs.kotlinx.coroutines.test)
         }
-        // The engine used by the tests that talk to a real server. Declared per source set because
-        // no single engine covers both: curl is the only one that speaks HTTPS on Kotlin/Native,
-        // and it does not exist on the JVM.
-        nativeTest.dependencies {
+        // The engine used by the tests that talk to a real server, declared per source set because
+        // no single engine covers all of them: curl is the only one that speaks HTTPS on Linux,
+        // Darwin the only one that exists on iOS, and neither of them exists on the JVM.
+        linuxTest.dependencies {
             implementation(libs.ktor.client.curl)
+        }
+        appleTest.dependencies {
+            implementation(libs.ktor.client.darwin)
         }
         jvmTest.dependencies {
             implementation(libs.ktor.client.cio)

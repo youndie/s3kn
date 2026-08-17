@@ -55,10 +55,11 @@ jobs:
           name: test-reports-linux
           path: '**/build/reports/tests/**'
 
-  # The development host target: if it breaks, everyone's local TDD loop stops.
-  # No MinIO here — the E2E tests skip themselves, deliberately, since S3_E2E_REQUIRED is unset.
+  # Every Apple target: macOS and, on a simulator, iOS. No MinIO — GitHub's macOS runners have no
+  # Docker, so the live tests skip themselves here, deliberately and with S3_E2E_REQUIRED unset.
+  # The live run on Apple is done by hand against a real server and recorded in the backlog.
   macos:
-    name: macosArm64
+    name: macOS + iOS
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v5

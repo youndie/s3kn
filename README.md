@@ -38,15 +38,23 @@ library writes the protocol out instead: the signature, and seven HTTP requests.
 **`linuxX64` is the platform this is built for and the only one it is claimed to work on.** Every
 milestone is closed there: the whole suite runs, including every operation against a real S3 server.
 
-| | |
-|---|---|
-| `linuxX64` | supported — full suite and live tests in CI, through `ktor-client-curl` |
-| `jvm` | the same code and the same live tests run in CI, through `ktor-client-cio`; not claimed yet only because nothing has been released |
-| `macosArm64` | the development host: unit tests run in CI, live tests are skipped there |
+| Target | Engine | |
+|---|---|---|
+| `linuxX64` | curl | supported — full suite and live tests in CI |
+| `jvm` | CIO | the same code and the same live tests run in CI; not claimed yet only because nothing has been released |
+| `macosArm64` | Darwin | the whole suite, live tests included, has been run against a real server — by hand, not in CI |
+| `macosX64` | Darwin | compiles and publishes; nothing has been run on it |
+| `iosSimulatorArm64`, `iosX64` | Darwin | unit tests run in CI on a simulator; no live tests |
+| `iosArm64` | Darwin | compiles and publishes; a device test has never been run |
+| `watchos`, `tvos` | — | not declared. Every dependency publishes them, and that is not the same claim |
 
-`ktor-client-curl` is the only engine that speaks HTTPS on Kotlin/Native — `ktor-network-tls` is a
-stub that throws at runtime. It carries its own libcurl and OpenSSL inside its cinterop klib, so
-nothing has to be installed for TLS; see [Gotchas](#gotchas) for what a container still needs.
+Two engines, because no one engine covers everything. `ktor-client-curl` is the only one that
+speaks HTTPS on Linux — `ktor-network-tls` is a stub that throws at runtime — and it publishes
+nothing for iOS at all. On Apple the engine is `ktor-client-darwin`, which also settles the
+certificate question below: NSURLSession uses the system trust store, so an Apple target needs
+nothing installed.
+
+The library depends on neither. Pick the engine, hand over an `HttpClient`.
 
 ## Add dependencies
 
@@ -61,8 +69,9 @@ repositories {
 
 dependencies {
     implementation("io.github.youndie:s3-client:0.1.0-SNAPSHOT")
-    // The engine is yours. On Kotlin/Native this is the one that speaks HTTPS.
-    implementation("io.ktor:ktor-client-curl:3.5.2")
+    // The engine is yours, and which one exists depends on the target.
+    implementation("io.ktor:ktor-client-curl:3.5.2")   // Linux, Windows, macOS
+    implementation("io.ktor:ktor-client-darwin:3.5.2") // macOS, iOS, and the only choice on iOS
 }
 ```
 
@@ -123,16 +132,19 @@ S3Config(
 
 Four things that cost a day each if you meet them without warning.
 
-- **A key containing a `.` or `..` path segment is refused.** libcurl removes such segments from the
-  path *after* the request is signed, so it could never arrive, and the symptom would be a bare
-  `SignatureDoesNotMatch`. `.hidden` and `..trailer` are ordinary names — only a whole segment
-  counts.
+- **A key containing a `.` or `..` path segment is refused, on every platform.** libcurl removes
+  such segments from the path *after* the request is signed, so through that engine it could never
+  arrive, and the symptom would be a bare `SignatureDoesNotMatch`. NSURLSession and the JVM engines
+  deliver it intact, and S3 accepts such keys — so this forbids something that works on two engines
+  of three. The signer cannot see which engine it will be handed, and a silent failure on the
+  primary target is worse than a refusal everywhere. `.hidden` and `..trailer` are ordinary
+  names — only a whole segment counts.
 - **A streamed body needs its length stated.** Without it the engine falls back to chunked encoding
   and S3 answers `411 MissingContentLength` — a failure that never shows up with a `ByteArray`.
-- **A container needs `ca-certificates`.** TLS itself is inside the engine's klib, but the root
-  certificates are read from `/etc/ssl/certs` at runtime and a slim image has none. See
+- **A Linux container needs `ca-certificates`.** TLS itself is inside the curl engine's klib, but
+  the root certificates are read from `/etc/ssl/certs` at runtime and a slim image has none. See
   [examples/tls-check](examples/tls-check), which builds the image both ways and requires opposite
-  outcomes.
+  outcomes. This does not apply on Apple: NSURLSession uses the system trust store.
 - **Completing a multipart upload can fail with `200 OK`.** Handled here — worth knowing if you ever
   read the raw responses.
 
@@ -150,7 +162,7 @@ Four things that cost a day each if you meet them without warning.
 |---|---|
 | `s3-core` | model, key encoding, timestamps, configuration, errors. No dependencies at all |
 | `s3-sigv4` | SigV4 and presigning. Pure Kotlin — no network, no engine, no cinterop |
-| `s3-client` | the seven operations over `ktor-client-core` |
+| `s3-client` | the seven operations over `ktor-client-core`, on whatever engine you supply |
 | `s3-testing` | vectors and switches for the live tests; not published |
 
 ## Testing

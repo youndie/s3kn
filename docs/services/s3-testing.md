@@ -5,7 +5,7 @@ type: service
 status: active
 module: :s3-testing
 tech_stack: [Kotlin Multiplatform, kotlinx-io]
-targets: [jvm, linuxX64, macosArm64]
+targets: [jvm, linuxX64, macosArm64, macosX64, iosArm64, iosSimulatorArm64, iosX64]
 owner: unassigned
 depends_on: []
 publishes: []

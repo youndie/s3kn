@@ -24,6 +24,8 @@ kotlincrypto-hash-sha2 = { module = "org.kotlincrypto.hash:sha2", version.ref = 
 ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
 ktor-client-mock = { module = "io.ktor:ktor-client-mock", version.ref = "ktor" }
 ktor-client-curl = { module = "io.ktor:ktor-client-curl", version.ref = "ktor" }
+# The engine on Apple. On iOS it is the only one: ktor-client-curl publishes no iOS target.
+ktor-client-darwin = { module = "io.ktor:ktor-client-darwin", version.ref = "ktor" }
 # Test-only, JVM side: the native tests use curl, and curl does not exist on the JVM.
 ktor-client-cio = { module = "io.ktor:ktor-client-cio", version.ref = "ktor" }
 
