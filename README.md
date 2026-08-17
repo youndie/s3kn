@@ -2,7 +2,7 @@
 
 [![ktlint](https://img.shields.io/badge/ktlint%20code--style-%E2%9D%A4-FF4081.svg)](https://ktlint.github.io/)
 [![kotlin](https://img.shields.io/badge/Kotlin-2.4.10-blue?logo=kotlin&logoColor=white)](https://kotlinlang.org)
-[![platform](https://img.shields.io/badge/platform-linuxX64-blue?logo=linux&logoColor=white)](#platform-support)
+[![platform](https://img.shields.io/badge/platform-linuxX64%20%7C%20jvm%20%7C%20apple-blue?logo=kotlin&logoColor=white)](#platform-support)
 [![s3-client](https://reposilite.kotlin.website/api/badge/latest/snapshots/io/github/youndie/s3-client?name=s3-client&color=40c14a&prefix=v)](https://reposilite.kotlin.website/#/snapshots/io/github/youndie/s3-client)
 [![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
@@ -43,8 +43,8 @@ milestone is closed there: the whole suite runs, including every operation again
 | `linuxX64` | curl | supported — full suite and live tests in CI |
 | `jvm` | CIO | the same code and the same live tests run in CI; not claimed yet only because nothing has been released |
 | `macosArm64` | Darwin | the whole suite, live tests included, has been run against a real server — by hand, not in CI |
-| `macosX64` | Darwin | compiles and publishes; nothing has been run on it |
-| `iosSimulatorArm64`, `iosX64` | Darwin | unit tests run in CI on a simulator; no live tests |
+| `iosSimulatorArm64` | Darwin | unit tests run in CI on a simulator; no live tests |
+| `iosX64`, `macosX64` | Darwin | compile and publish; the CI runner is Apple Silicon, so nothing has ever run on them |
 | `iosArm64` | Darwin | compiles and publishes; a device test has never been run |
 | `watchos`, `tvos` | — | not declared. Every dependency publishes them, and that is not the same claim |
 
