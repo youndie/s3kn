@@ -53,6 +53,21 @@ public class SignedRequest internal constructor(
 )
 
 /**
+ * Whether the signer fills in the headers it owns, or signs exactly what it was handed.
+ *
+ * Header authentication and query authentication put the same facts in different places: with a
+ * presigned URL the date and the session token travel as query parameters, so signing them as
+ * headers too would produce a signature over headers the browser will never send.
+ */
+public enum class HeaderPolicy {
+    /** The signer writes `x-amz-date` and `x-amz-security-token`, replacing any it was given. */
+    MANAGED,
+
+    /** The signer signs exactly the headers given, and adds none. */
+    AS_GIVEN,
+}
+
+/**
  * Signature Version 4, header-based.
  *
  * The algorithm is in docs/spec/reference/botocore-auth.py — canonical request at `:370`, string to
@@ -74,8 +89,13 @@ public class SigV4Signer(
         request: SigningRequest,
         credentials: S3Credentials,
         timestamp: SigningTimestamp,
+        headerPolicy: HeaderPolicy = HeaderPolicy.MANAGED,
     ): SignedRequest {
-        val headers = headersToSign(request.headers, credentials, timestamp)
+        val headers =
+            when (headerPolicy) {
+                HeaderPolicy.MANAGED -> headersToSign(request.headers, credentials, timestamp)
+                HeaderPolicy.AS_GIVEN -> request.headers
+            }
         val canonical = canonicalRequest(request, headers)
         val stringToSign = stringToSign(canonical, timestamp)
         val signature = signature(credentials.secretAccessKey, timestamp, stringToSign)

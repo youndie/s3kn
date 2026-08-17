@@ -50,6 +50,41 @@ class S3ConfigTest {
     }
 
     @Test
+    fun `path style puts the bucket in front of the key`() {
+        val config = config(AddressingStyle.PATH, "http://localhost:9000")
+
+        assertEquals("/photos/hello.txt", config.encodedPathFor("photos", "hello.txt"))
+        assertEquals("http://localhost:9000/photos/hello.txt", config.urlFor("photos", "hello.txt"))
+    }
+
+    @Test
+    fun `virtual hosted style leaves only the key in the path`() {
+        val config = config(AddressingStyle.VIRTUAL_HOSTED, "https://s3.us-east-1.amazonaws.com")
+
+        assertEquals("/hello.txt", config.encodedPathFor("photos", "hello.txt"))
+        assertEquals(
+            "https://photos.s3.us-east-1.amazonaws.com/hello.txt",
+            config.urlFor("photos", "hello.txt"),
+        )
+    }
+
+    @Test
+    fun `addresses the bucket itself when there is no key`() {
+        // What a listing needs. The trailing slash of the path style is deliberate: one rule,
+        // `/bucket/` plus the encoded key, holds whether the key is empty or not.
+        assertEquals("/photos/", config(AddressingStyle.PATH, "https://example.com").encodedPathFor("photos", ""))
+        assertEquals("/", config(AddressingStyle.VIRTUAL_HOSTED, "https://example.com").encodedPathFor("photos", ""))
+    }
+
+    @Test
+    fun `encodes the key in the path through the one encoder`() {
+        val config = config(AddressingStyle.VIRTUAL_HOSTED, "https://example.com")
+
+        assertEquals("/my%20dir/file.txt", config.encodedPathFor("photos", "my dir/file.txt"))
+        assertEquals("/a/./b", config.encodedPathFor("photos", "a/./b"))
+    }
+
+    @Test
     fun `keeps the secret key out of the text form of the credentials`() {
         val text = credentials.toString()
 

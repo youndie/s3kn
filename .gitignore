@@ -4,3 +4,4 @@ build/
 local.properties
 .idea/
 .DS_Store
+docs/spec/s3-signing-vectors/.venv/

@@ -75,6 +75,35 @@ public class S3Config(
             }
         }
 
+    /**
+     * The path of a request against this bucket and key, already percent-encoded.
+     *
+     * This is the string that is signed and the string that is sent — they come from here so that
+     * they cannot be produced by two different encoders
+     * (docs/research/research-architecture.md, decision R4).
+     *
+     * An empty key addresses the bucket itself, which is what a listing does. In
+     * [AddressingStyle.PATH] that leaves a trailing slash, and deliberately so: one rule,
+     * `/bucket/` followed by the encoded key, covers both cases.
+     *
+     * The bucket is not encoded. S3 bucket names are restricted to lower-case letters, digits,
+     * hyphens and dots, none of which percent-encoding would touch.
+     */
+    public fun encodedPathFor(
+        bucket: String,
+        key: String,
+    ): String =
+        when (addressingStyle) {
+            AddressingStyle.PATH -> "/$bucket/${uriEncodeKey(key)}"
+            AddressingStyle.VIRTUAL_HOSTED -> "/${uriEncodeKey(key)}"
+        }
+
+    /** The full URL of a request, without a query string. */
+    public fun urlFor(
+        bucket: String,
+        key: String,
+    ): String = "${endpoint.scheme}://${hostHeaderFor(bucket)}${encodedPathFor(bucket, key)}"
+
     override fun toString(): String =
         "S3Config(endpoint=$endpoint, region=$region, addressingStyle=$addressingStyle, " +
             "credentials=$credentials)"

@@ -34,7 +34,7 @@ internal fun parseHttpRequest(text: String): ParsedHttpRequest {
     return ParsedHttpRequest(
         method = method,
         path = target.substringBefore('?'),
-        query = parseQuery(target.substringAfter('?', missingDelimiterValue = "")),
+        query = parseRawQuery(target.substringAfter('?', missingDelimiterValue = "")),
         headers = parseHeaders(lines.drop(1)),
         body = body,
     )
@@ -56,7 +56,7 @@ private fun parseHeaders(lines: List<String>): List<Pair<String, String>> {
     return headers
 }
 
-private fun parseQuery(rawQuery: String): List<Pair<String, String>> {
+internal fun parseRawQuery(rawQuery: String): List<Pair<String, String>> {
     if (rawQuery.isEmpty()) return emptyList()
     return rawQuery.split("&").map { pair ->
         percentDecode(pair.substringBefore('=')) to
