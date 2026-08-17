@@ -1,0 +1,33 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{kt,kts}]
+max_line_length = 120
+ktlint_code_style = ktlint_official
+# Imports are listed explicitly: a star import hides where a type came from, and this project has
+# similarly named entities living in core and in the adapters side by side.
+ij_kotlin_allow_trailing_comma = true
+ij_kotlin_allow_trailing_comma_on_call_site = true
+ij_kotlin_name_count_to_use_star_import = 2147483647
+ij_kotlin_name_count_to_use_star_import_for_members = 2147483647
+
+[*.{md,txt}]
+trim_trailing_whitespace = false
+max_line_length = off
+
+[docs/spec/**]
+# The vendored specification is compared byte for byte by the tests. Nothing may touch it —
+# not a trailing newline, not a stripped space.
+insert_final_newline = unset
+trim_trailing_whitespace = false
+end_of_line = unset
+
+[*.{yml,yaml,json}]
+indent_size = 2

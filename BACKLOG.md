@@ -1,0 +1,144 @@
+# BACKLOG — s3kn
+
+Вехи закрываются целиком. **GATE вехи**: все её тесты зелёные на `linuxX64`, `ktlintCheck` чист,
+документы слоёв обновлены в том же коммите. Промежуточных зачётов нет.
+
+**Процесс внутри задачи** ([ресёрч, Р10](docs/research/research-architecture.md)): сначала тест со
+ссылкой на строку в `docs/spec/`, тест красный по нужной причине — потом реализация. Задача без
+ссылки на спецификацию в тесте не считается сделанной.
+
+Архитектура и обоснования — [docs/research/research-architecture.md](docs/research/research-architecture.md).
+Контракт, по которому пишутся тесты, — [docs/api/protocol-s3.md](docs/api/protocol-s3.md).
+Что лежит в `docs/spec/` и как на него ссылаться — [docs/spec/README.md](docs/spec/README.md).
+
+Объём v1 ограничен сознательно: **put, get, delete, head, list, multipart, presign**. Всё остальное
+(ACL, теги, версии, lifecycle, SSE-C, копирование, batch-delete) — после v1 и в этот бэклог не
+попадает.
+
+---
+
+## M0 — репозиторий, сборка, инструменты
+
+- [x] **M-01** Координаты публикации: `io.github.youndie`, артефакты `s3-<модуль>`, пакет `io.github.youndie.s3`
+- [x] **M-02** Gradle-скелет: `settings.gradle.kts`, каталог версий `gradle/libs.versions.toml` (Kotlin 2.4.10, coroutines 1.11.0, ktor 3.5.2, kotlincrypto 0.8.0), конвенция сборки для KMP-модулей; Gradle 9.7.0, JDK 25
+- [x] **M-03** Модули `:s3-core`, `:s3-sigv4`, `:s3-client`, `:s3-testing` с таргетами `linuxX64`, `macosArm64`, `jvm` ([Р1](docs/research/research-architecture.md)); пустые, но собираются и прогоняют тесты
+- [x] **M-04** ktlint 1.8.0 как CLI, задачи `ktlintCheck` / `ktlintFormat`, `.editorconfig` со стилем `ktlint_official`
+- [x] **M-05** CI на GitHub Actions: `ubuntu-latest` — сборка, тесты `linuxX64`, `ktlintCheck`; `macos-latest` — хостовый таргет локального цикла
+- [x] **M-06** README (английский), LICENSE, CONTRIBUTING с правилом «тест по спецификации → код → GATE»
+- [x] **M-07** Первый красный тест: загрузчик кейса `get-vanilla` из `docs/spec/aws-sig-v4-test-suite/` читает `.req`/`.creq` — доказывает, что цикл TDD и доступ к ресурсам из теста на `linuxX64` работают целиком
+
+**Итог M0.** Цикл TDD прошёл целиком: с заглушкой `TODO()` в загрузчике все три теста упали
+`NotImplementedError` на `linuxX64` — то есть красными по нужной причине, а не из-за конфигурации
+сборки, — после реализации позеленели. Сверх плана вылезли четыре вещи.
+
+**Понятия «ресурсы теста», общего для JVM и Kotlin/Native, нет.** Векторы — 700 КБ файлов,
+которые обязаны остаться байт в байт такими, какими их опубликовал AWS; копировать их во вторую
+директорию ради classpath значит завести вторую копию и следить за ней. Вместо этого задача
+`generateSpecPath` записывает абсолютный путь `docs/spec` в сгенерированную константу, а файлы
+читаются через `kotlinx-io` — единственный файловый API, работающий на всех трёх таргетах. Это
+добавило в каталог версий `kotlinx-io` 0.9.1, которого в плане вехи не было.
+
+**`.editorconfig` пришлось явно оградить от `docs/spec/`.** Файлы векторов кончаются **без**
+перевода строки и разделяются `\n`, а не `\r\n`, хотя `.req` — это HTTP-запрос. Любая настройка
+вида «дописывать финальный перевод строки» тихо портит их, и падать начнёт не форматирование,
+а сравнение подписи через две вехи. Секция `[docs/spec/**]` отключает всё, что трогает байты.
+
+**Gradle 9.7 объявил устаревшим делегатный стиль Kotlin DSL:** `by tasks.registering(...)` и
+`configurations.creating` предупреждают о несовместимости с Gradle 10. Всё переписано на
+`tasks.register<T>("name")` и `configurations.create("name")`.
+
+**`kotlinx.io.buffered` — top-level extension и требует явного импорта.** Диагностика при этом
+показывает кандидаты из `java.io` и выглядит как проблема JVM-таргета, хотя ломается общий код;
+в проекте запрещены звёздочные импорты, так что ловится это на каждом новом API `kotlinx-io`.
+
+**GATE закрыт.** `./gradlew build --rerun-tasks --no-build-cache` зелёный на Linux: 3 теста
+`:s3-testing` выполнились на `linuxX64` (задача действительно запускается, а не пропускается)
+и на `jvm`. Те же 3 теста зелёные на `macosArm64`, прогнанные на macOS-хосте. `ktlintCheck` чист.
+
+## M1 — `:s3-core`: то, от чего зависит всё остальное
+
+- [ ] **M-10** `uriEncodeKey` — единственный кодировщик ключа, один на подпись и на URL ([Р4](docs/research/research-architecture.md), `botocore-auth.py:268`); векторы — таблица из [protocol-s3.md, раздел 2](docs/api/protocol-s3.md)
+- [ ] **M-11** Кодирование canonical query: `/` → `%2F`, сортировка по закодированному ключу, при равных ключах — по значению (`botocore-auth.py:268`)
+- [ ] **M-12** Формат метки времени `yyyyMMdd'T'HHmmss'Z'` из `kotlin.time.Instant` без `kotlinx-datetime` ([факт 1.7](docs/research/research-architecture.md)); тест на границу суток — дата в scope берётся из той же строки, а не считается отдельно
+- [ ] **M-13** `S3Config`: endpoint, регион, стиль адресации (path-style / virtual-hosted, [Открытый вопрос 3](docs/research/research-architecture.md)), учётные данные, `Clock`
+- [ ] **M-14** Вывод `host` из URL: нижний регистр, дефолтный порт отбрасывается, нестандартный остаётся (`botocore-auth.py:81`)
+- [ ] **M-15** Модель ошибок: `S3Exception` с кодом S3 **или** без него, статусом, `x-amz-request-id`, `x-amz-id-2` ([Риск 7](docs/research/research-architecture.md))
+
+## M2 — `:s3-sigv4`: ядро подписи на официальных векторах
+
+Веха, у которой приёмка уже написана и лежит в репозитории. Сеть и HTTP-движок здесь не участвуют.
+
+- [ ] **M-20** Загрузчик кейсов: разбор `.req` в метод / путь / query / заголовки / тело
+- [ ] **M-21** Canonical headers и signed headers: нижний регистр, обрезка краевых пробелов, схлопывание внутренних, повторяющиеся имена — через запятую (`botocore-auth.py:301`, кейсы `get-header-*`)
+- [ ] **M-22** Canonical request целиком; сверка с `.creq` по всем 34 кейсам, кроме режима S3
+- [ ] **M-23** String to sign; сверка с `.sts` (`botocore-auth.py:405`)
+- [ ] **M-24** Вывод ключа подписи и заголовок `Authorization`; сверка с `.authz` (`botocore-auth.py:417`, `:445`)
+- [ ] **M-25** Временный токен: `X-Amz-Security-Token` подписывается (кейсы `post-sts-token/*`)
+- [ ] **M-26** Кейсы `normalize-path/*` в **общем** режиме: нормализация и повторное кодирование (`botocore-auth.py:385`)
+
+**GATE M2.** Все 34 кейса зелёные, включая четыре, которые не гоняет сам botocore
+(`normalize-path/get-space`, `get-vanilla-query-order-key`, `get-vanilla-query-order-key-case`,
+`get-vanilla-query-order-value`) — его ограничения относятся к его HTTP-парсеру и к его API,
+а не к алгоритму.
+
+## M3 — режим S3 и presign
+
+- [ ] **M-30** Режим S3: путь берётся как есть, без нормализации и без повторного кодирования ([Р5](docs/research/research-architecture.md), `botocore-auth.py:538`); тест закрепляет, что кейсы `normalize-path/*` в этом режиме дают **другой** ответ, чем в общем
+- [ ] **M-31** `x-amz-content-sha256`: hex тела, константа пустого тела (`botocore-auth.py:55`), `UNSIGNED-PAYLOAD`
+- [ ] **M-32** Выбор значения по умолчанию: поток поверх https → `UNSIGNED-PAYLOAD`; поверх http → внятный отказ ([Р6](docs/research/research-architecture.md))
+- [ ] **M-33** Presign: набор query-параметров, подпись дописывается последней и в canonical query не входит (`botocore-auth.py:722`, `:787`, `:810`)
+- [ ] **M-34** Presign: дефолт `X-Amz-Expires` 3600, потолок 604800, отказ до отправки при превышении
+- [ ] **M-35** Presign для `GET` и для `PUT`; проверка, что подписанная ссылка работает — в M4, когда появится MinIO
+
+## M4 — транспорт и первый живой запрос
+
+- [ ] **M-40** `docker-compose.yml` с MinIO, зафиксированным тегом `RELEASE.2025-09-07T16-13-09Z` ([Р9](docs/research/research-architecture.md))
+- [ ] **M-41** `:s3-client` поверх `HttpClient` ([Р2](docs/research/research-architecture.md)); движок в зависимости библиотеки не входит
+- [ ] **M-42** Построение URL: path-style и virtual-hosted, `encodedPath` уходит уже закодированным, чтобы Ktor его не трогал
+- [ ] **M-43** `head` против MinIO — первая операция, проверяющая всю цепочку целиком
+- [ ] **M-44** `head` несуществующего ключа: `404` **без тела**, код выводится из статуса ([Риск 7](docs/research/research-architecture.md))
+- [ ] **M-45** Диагностика `SignatureDoesNotMatch`: исключение несёт наш canonical request и присланный сервером ([Риск 4](docs/research/research-architecture.md))
+- [ ] **M-46** Тесты на ключи с пробелом, `+`, `~`, кириллицей, эмодзи, `//` и `/./` — против MinIO, не только на векторах
+- [ ] **M-47** Проверка presign из M3 живой ссылкой
+- [ ] **M-48** `examples/` с `Dockerfile`, где стоит `ca-certificates`, и тест, ходящий по https **из образа** ([Риск 2](docs/research/research-architecture.md))
+
+## M5 — put, get, delete
+
+- [ ] **M-50** `put(key, ByteArray)`: `ETag` в ответе (`s3-service-2.json:1353`)
+- [ ] **M-51** `put(key, ByteReadChannel, contentLength)`: длина — обязательный параметр ([Р7](docs/research/research-architecture.md))
+- [ ] **M-52** Тест на отсутствие длины: без неё уходит chunked и приходит `411 MissingContentLength` (`s3-service-2.json:4768`) — закрепляет, зачем параметр обязателен
+- [ ] **M-53** `get`: тело потоком, в память целиком не читается
+- [ ] **M-54** `get` с `Range`: ответ `206`
+- [ ] **M-55** `get` несуществующего ключа: `404` с XML-телом, разбор `<Error>`
+- [ ] **M-56** `delete`: успех `204` (`s3-service-2.json:329`)
+- [ ] **M-57** `delete` несуществующего ключа **успешен** — тест закрепляет контринтуитивное поведение
+- [ ] **M-58** Разбор `<Error>`: код, сообщение, `RequestId`, `HostId`
+
+## M6 — list
+
+- [ ] **M-60** Разбор `ListBucketResult` своим парсером ([Р8](docs/research/research-architecture.md))
+- [ ] **M-61** `encoding-type=url` отправляется всегда; декодируются `Key`, `Prefix`, `Delimiter`, `StartAfter`, `ContinuationToken`, `CommonPrefixes` ([следствие 1.5.3](docs/research/research-architecture.md))
+- [ ] **M-62** Тест на ключ с символом, непарсимым XML 1.0, — доказывает, что флаг не зря обязательный
+- [ ] **M-63** Пагинация по `NextContinuationToken`, признак конца — `IsTruncated`
+- [ ] **M-64** `prefix` и `delimiter`: `CommonPrefixes` как отдельная ветка результата
+- [ ] **M-65** `KeyCount` — число на странице, не всего в бакете; тест закрепляет
+- [ ] **M-66** Ленивая выдача страниц (`Flow`), чтобы бакет на миллион ключей не приезжал в память
+
+## M7 — multipart
+
+- [ ] **M-70** `create`: `POST ?uploads`, `<UploadId>` (`s3-service-2.json:108`)
+- [ ] **M-71** `uploadPart`: `ETag` берётся **из заголовка** ответа (`shapes.UploadPartOutput.members.ETag`)
+- [ ] **M-72** `complete`: тело со списком частей по возрастанию `PartNumber`
+- [ ] **M-73** **Успех определяется корневым элементом тела, а не статусом 200** (`s3-service-2.json:32`, [Риск 6](docs/research/research-architecture.md)); воспроизводится через `MockEngine`, от MinIO такого не добьёшься
+- [ ] **M-74** `abort`: `204` (`s3-service-2.json:18`)
+- [ ] **M-75** Проверка минимального размера части: две части по 1 МиБ → `EntityTooSmall`; закрывает гипотезу про 5 МиБ из [protocol-s3.md, 4.6](docs/api/protocol-s3.md)
+- [ ] **M-76** Границы `partNumber`: 0 и 10001 отвергаются до отправки (`s3-service-2.json:1604`)
+- [ ] **M-77** Загрузка целого объекта частями поверх `put`, с параллелизмом
+- [ ] **M-78** Замер параллелизма 1 / 4 / 16 частей по 8 МБ — упирается ли пропускная способность в поток `curl-dispatcher` ([Риск 5](docs/research/research-architecture.md)); закрывает гипотезу
+- [ ] **M-79** Отмена загрузки посередине не оставляет висящих частей: `abort` вызывается при отмене корутины
+
+## M8 — выпуск
+
+- [ ] **M-80** Документы слоёв: `docs/services/` на каждый модуль, `docs/features/` на put/get/list/multipart/presign
+- [ ] **M-81** Публикация в Maven Central
+- [ ] **M-82** README с примером на `linuxX64` и явным указанием, какой OpenSSL внутри текущей версии Ktor ([Риск 1](docs/research/research-architecture.md))

@@ -1,0 +1,10 @@
+# The vendored specification is third-party material: it must not colour the language stats,
+# and GitHub must not try to render 1.4 MB of API model in a diff.
+docs/spec/** linguist-vendored
+docs/spec/** -diff
+
+# The test vectors are compared byte for byte. Git must never touch their line endings.
+docs/spec/aws-sig-v4-test-suite/** -text
+
+*.jar binary
+gradlew text eol=lf
