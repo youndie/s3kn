@@ -38,6 +38,8 @@
 - [features/feature-multipart.md](features/feature-multipart.md) — многочастная загрузка.
 - [features/feature-presign.md](features/feature-presign.md) — подписанные ссылки.
 - [../BACKLOG.md](../BACKLOG.md) — вехи M0…M8 и задачи `M-NN`.
+- [measurements.md](measurements.md) — что измерено на стенде из двух машин и что этот замер
+  не доказывает.
 - [../RELEASING.md](../RELEASING.md) — что публикуется, куда и почему одним заданием.
 
 ## Карта покрытия
