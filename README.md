@@ -196,11 +196,16 @@ and that the five-mebibyte minimum part size, which the API model declines to st
 - **Not a bucket manager.** Creating and deleting buckets is out of scope; the tests use `mc` for it.
 - **Not usable with keys containing `.` or `..` segments.** S3 accepts them; no HTTP client this
   library can reach will deliver them.
-- **Not fast beyond about 125 MiB/s per process.** Measured on two machines with the server on the
-  other one: throughput doubles from one part at a time to two and then stops, while a single
-  thread sits at 95% of a core. The link and the server are four to five times further away —
-  `mc` moves the same bytes at 465–610 MiB/s — and two client processes add up linearly. Numbers
-  and what they do not prove: [docs/measurements.md](docs/measurements.md).
+- **Not fast beyond about 125 MiB/s per process** — a gigabit, which is more than the link most
+  services have to their storage, and a ceiling you only meet on a local one. Measured on two
+  machines with the server on the other: throughput doubles from one part at a time to two and then
+  stops, while a **single thread** sits at 95% of a core. Neither the link nor the server is the
+  limit — `mc` moves the same bytes at 465–610 MiB/s over the same wire, and two client processes
+  add up linearly. The engine runs one dispatcher thread per instance and every request goes through
+  it, so several `HttpClient`s would probably raise the ceiling; that is a reading of the engine
+  rather than a measurement, and it is not a shape this library asks for. Changing engines is not a
+  way out either: on Kotlin/Native curl is the only one that speaks TLS. Numbers and what they do
+  not prove: [docs/measurements.md](docs/measurements.md).
 
 ## Building
 
