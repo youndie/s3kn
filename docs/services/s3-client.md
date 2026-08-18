@@ -5,7 +5,7 @@ type: service
 status: active
 module: :s3-client
 tech_stack: [Kotlin Multiplatform, Ktor client]
-targets: [jvm, linuxX64, macosArm64, macosX64, iosArm64, iosSimulatorArm64, iosX64]
+targets: [jvm, linuxX64, macosArm64, iosArm64, iosSimulatorArm64, iosX64]
 owner: unassigned
 depends_on:
   - s3-sigv4

@@ -44,9 +44,10 @@ milestone is closed there: the whole suite runs, including every operation again
 | `jvm` | CIO | the same code and the same live tests run in CI; not claimed yet only because nothing has been released |
 | `macosArm64` | Darwin | the whole suite, live tests included, has been run against a real server — by hand, not in CI |
 | `iosSimulatorArm64` | Darwin | unit tests run in CI on a simulator; no live tests |
-| `iosX64`, `macosX64` | Darwin | compile and publish; the CI runner is Apple Silicon, so nothing has ever run on them |
+| `iosX64` | Darwin | compiles and publishes; the CI runner is Apple Silicon, so nothing has ever run on it |
 | `iosArm64` | Darwin | compiles and publishes; a device test has never been run |
 | `watchos`, `tvos` | — | not declared. Every dependency publishes them, and that is not the same claim |
+| `macosX64` | — | not declared: Kotlin has deprecated the target, and nothing ever ran on it here |
 
 Two engines, because no one engine covers everything. `ktor-client-curl` is the only one that
 speaks HTTPS on Linux — `ktor-network-tls` is a stub that throws at runtime — and it publishes

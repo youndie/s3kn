@@ -27,8 +27,12 @@ kotlin {
     //
     // `watchos` and `tvos` are left out although every dependency publishes them: no test has ever
     // run there, and "it compiles" is a different claim from "it works".
+    //
+    // `macosX64` is left out too, and for a stronger reason: Kotlin has deprecated the target —
+    // "will be removed in a future release" — and nothing here has ever run on it, since the CI
+    // runner is Apple Silicon. Publishing a deprecated target nobody exercises is a claim with
+    // nothing behind it.
     macosArm64()
-    macosX64()
     iosArm64()
     iosSimulatorArm64()
     iosX64()
