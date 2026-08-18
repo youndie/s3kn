@@ -16,6 +16,8 @@ kotlin {
         linuxX64Main.dependencies {
             implementation(projects.s3Client)
             implementation(libs.ktor.client.curl)
+            // Plain HTTP only, and only here — see engineOf() for why the library cannot use it.
+            implementation(libs.ktor.client.cio)
         }
     }
 }

@@ -196,11 +196,14 @@ and that the five-mebibyte minimum part size, which the API model declines to st
 - **Not a bucket manager.** Creating and deleting buckets is out of scope; the tests use `mc` for it.
 - **Not usable with keys containing `.` or `..` segments.** S3 accepts them; no HTTP client this
   library can reach will deliver them.
-- **Not fast beyond about 125 MiB/s per process.** Measured on two machines with the server on the
-  other one: throughput doubles from one part at a time to two and then stops, while a single
-  thread sits at 95% of a core. The link and the server are four to five times further away —
-  `mc` moves the same bytes at 465–610 MiB/s — and two client processes add up linearly. Numbers
-  and what they do not prove: [docs/measurements.md](docs/measurements.md).
+- **Not faster than the dispatcher you call it on.** A multipart upload signs every part, and
+  hashing is real CPU work; `putMultipart` inherits the caller's coroutine context, so calling it
+  from `runBlocking {}` — one event-loop thread — leaves that hashing serialised on a single thread
+  no matter how many parts go at once. Handing the same code `Dispatchers.Default` moved the ceiling
+  by 2.3× in a measurement, with the same engine and the same server. **Call it from a
+  multi-threaded dispatcher.** The engine is not the variable here: curl and CIO produce the same
+  curve and the same saturated thread. Numbers, and what they do not prove:
+  [docs/measurements.md](docs/measurements.md).
 
 ## Building
 

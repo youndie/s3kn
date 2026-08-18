@@ -6,12 +6,16 @@ import io.github.youndie.s3.S3Config
 import io.github.youndie.s3.S3Credentials
 import io.github.youndie.s3.S3Endpoint
 import io.ktor.client.HttpClient
+import io.ktor.client.engine.HttpClientEngineFactory
+import io.ktor.client.engine.cio.CIO
 import io.ktor.client.engine.curl.Curl
 import io.ktor.utils.io.ByteReadChannel
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.toKString
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import platform.posix.getenv
+import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.time.Duration
 import kotlin.time.TimeSource
 
@@ -39,6 +43,12 @@ fun main(args: Array<String>) {
     val runs = options["--runs"]?.toInt() ?: 3
     val concurrencies = (options["--concurrency"] ?: "1,2,4,8,16").split(",").map { it.trim().toInt() }
     val partSize = (options["--part-size"]?.toLong() ?: 8L) * MIB
+    val engineName = options["--engine"] ?: "curl"
+    val engine = engineOf(engineName)
+    // "main" is what a caller gets by default from runBlocking: one event-loop thread, and every
+    // part hashed on it. "default" hands the same code a multi-threaded dispatcher.
+    val dispatcherName = options["--dispatcher"] ?: "main"
+    val context = if (dispatcherName == "default") Dispatchers.Default else EmptyCoroutineContext
 
     val config =
         S3Config(
@@ -55,11 +65,14 @@ fun main(args: Array<String>) {
         )
 
     val payload = ByteArray(megabytes * MIB.toInt()) { (it % 251).toByte() }
-    println("endpoint=$endpoint bucket=$bucket size=${megabytes}MiB part=${partSize / MIB}MiB runs=$runs")
+    println(
+        "engine=$engineName dispatcher=$dispatcherName endpoint=$endpoint bucket=$bucket " +
+            "size=${megabytes}MiB part=${partSize / MIB}MiB runs=$runs",
+    )
     println()
 
-    runBlocking {
-        HttpClient(Curl).use { http ->
+    runBlocking(context) {
+        HttpClient(engine).use { http ->
             val client = S3Client(config, http)
 
             // Discarded on purpose: the first upload pays for the connection, the TLS-less
@@ -112,6 +125,22 @@ fun main(args: Array<String>) {
         }
     }
 }
+
+/**
+ * The engine under test.
+ *
+ * `CIO` is here and nowhere else in the project: it cannot serve the library, because
+ * `ktor-network-tls` throws on Kotlin/Native and the engine would have no HTTPS
+ * (docs/research/research-architecture.md, fact 1.1). Over plain HTTP it runs, which is enough to
+ * ask the one question this binary is for — whether curl's single dispatcher thread is what holds
+ * the ceiling, or whether the ceiling is somewhere both engines share.
+ */
+private fun engineOf(name: String): HttpClientEngineFactory<*> =
+    when (name) {
+        "curl" -> Curl
+        "cio" -> CIO
+        else -> error("unknown engine: $name (curl, cio)")
+    }
 
 private suspend fun upload(
     client: S3Client,
