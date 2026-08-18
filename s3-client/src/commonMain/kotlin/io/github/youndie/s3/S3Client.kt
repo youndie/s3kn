@@ -393,6 +393,12 @@ public class S3Client(
      * propagates. A multipart upload nobody finishes keeps its parts, and they are billed until
      * somebody notices.
      *
+     * Parts are uploaded on the caller's coroutine context, and signing every part means hashing
+     * it, which is real CPU work. Called from a single-threaded context — `runBlocking {}` and its
+     * event loop being the easy way into one — that hashing is serialised, and [concurrency] then
+     * overlaps only the waiting. Call this from a multi-threaded dispatcher; measured, it is worth
+     * a factor of two (docs/measurements.md).
+     *
      * @param partSize size of every part but the last; S3 requires at least
      *   [S3MultipartLimits.MIN_PART_SIZE].
      * @param concurrency how many parts to send at once.
