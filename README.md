@@ -195,9 +195,11 @@ and that the five-mebibyte minimum part size, which the API model declines to st
 - **Not a bucket manager.** Creating and deleting buckets is out of scope; the tests use `mc` for it.
 - **Not usable with keys containing `.` or `..` segments.** S3 accepts them; no HTTP client this
   library can reach will deliver them.
-- **Not benchmarked properly.** Parts uploaded four at a time move 20 MiB about a quarter faster
-  than one at a time, but the server shares the machine with the client, so that number bounds the
-  pair rather than either one.
+- **Not fast beyond about 125 MiB/s per process.** Measured on two machines with the server on the
+  other one: throughput doubles from one part at a time to two and then stops, while a single
+  thread sits at 95% of a core. The link and the server are four to five times further away —
+  `mc` moves the same bytes at 465–610 MiB/s — and two client processes add up linearly. Numbers
+  and what they do not prove: [docs/measurements.md](docs/measurements.md).
 
 ## Building
 
