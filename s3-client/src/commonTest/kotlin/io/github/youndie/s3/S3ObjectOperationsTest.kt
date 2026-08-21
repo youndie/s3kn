@@ -72,8 +72,10 @@ class S3ObjectOperationsTest {
     @Test
     fun `signs a streamed body as unsigned and states its length`() =
         runTest {
-            // The length is the point. Without it the engine falls back to chunked encoding and S3
-            // answers 411 MissingContentLength — a failure that never shows up with a ByteArray.
+            // The length is the point. Without it the engine falls back to chunked encoding, and
+            // MinIO answers 411 MissingContentLength — a failure that never shows up with a
+            // ByteArray. Not "S3 answers": ceph/s3-tests sends that shape and expects 200. Stating
+            // the length is what every server accepts, which is why it is required here.
             val request =
                 capture(endpoint = "https://s3.us-east-1.amazonaws.com") { client ->
                     client.put("photos", "big.bin", ByteReadChannel("streamed"), contentLength = 8)

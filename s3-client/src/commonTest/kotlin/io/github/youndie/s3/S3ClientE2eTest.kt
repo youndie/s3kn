@@ -236,12 +236,19 @@ class S3ClientE2eTest {
         }
 
     @Test
-    fun `is answered with 411 when a body arrives without a stated length`() =
+    fun `minio answers 411 when a body arrives without a stated length`() =
         runTest {
             // Why `contentLength` is a required parameter of `put` rather than a convenience. Sent
-            // here deliberately without one, through a presigned URL, so the server's own answer is
-            // on record instead of a claim quoted from the API model
-            // (docs/spec/s3-service-2.json:4768).
+            // here deliberately without one, through a presigned URL, so a server's own answer is
+            // on record instead of a claim quoted from the API model.
+            //
+            // **Whose answer, though.** This suite runs against MinIO (docker-compose.yml), and
+            // 411 is MinIO's. S3 is not known to agree: `ceph/s3-tests` sends the same shape —
+            // botocore drops Content-Length entirely once Transfer-Encoding is added before
+            // signing — and expects 200, unmarked as failing on AWS. So this pins the behaviour of
+            // the server it talks to, and the required parameter is justified by being portable
+            // rather than by what S3 does. Pointed at a server that follows the suite, this case
+            // is expected to fail; that is a disagreement about servers, not about this client.
             val fixture = fixture() ?: return@runTest
             val url = fixture.signer.presign("PUT", E2E.bucket, "e2e/no-length.bin", expires = 5.minutes)
 

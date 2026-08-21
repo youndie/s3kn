@@ -130,9 +130,16 @@ public class S3Client(
      * Stores an object whose body is streamed.
      *
      * [contentLength] is required and not a convenience. Without it the engine falls back to
-     * chunked transfer encoding, and S3 answers `411 MissingContentLength`
-     * (docs/spec/s3-service-2.json:4768). That failure appears only with a real stream, never with
-     * a `ByteArray`, so an optional parameter would hide it until production.
+     * chunked transfer encoding, and what happens next is **not the same everywhere**: MinIO
+     * answers `411 MissingContentLength` — the e2e suite here records that answer — while
+     * `ceph/s3-tests` sends the same shape to S3 and expects `200`
+     * (`test_object_write_with_chunked_transfer_encoding`). The API model settles neither: its
+     * `MissingContentLength` entry is a line in the general error list and says nothing about
+     * framing.
+     *
+     * A required parameter is the portable choice rather than a claim about S3: a stated length
+     * is accepted by every server, and the failure it avoids appears only with a real stream,
+     * never with a `ByteArray`, so an optional parameter would hide it until production.
      *
      * The body cannot be hashed before it is read, so it is signed as `UNSIGNED-PAYLOAD`. Over
      * plain HTTP that is refused unless the configuration allows it.
