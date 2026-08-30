@@ -25,12 +25,10 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: 25
-
-      - uses: gradle/actions/setup-gradle@v4
+      # Java and Gradle in one step, at the version the whole portfolio uses. The action installs
+      # both 21 and 25: Gradle runs on the newer one, and having the other present keeps a toolchain
+      # request from turning into a download nobody asked for.
+      - uses: youndie/sborka/.github/actions/setup-kotlin@main
 
       # docker-compose is the single source of truth for the test server. A service container would
       # duplicate it here and drift from what a developer runs locally.
@@ -64,12 +62,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: 25
-
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: youndie/sborka/.github/actions/setup-kotlin@main
 
       - name: build
         run: ./gradlew build --stacktrace
@@ -91,12 +84,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: 25
-
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: youndie/sborka/.github/actions/setup-kotlin@main
 
       - name: with and without ca-certificates
         run: ./examples/tls-check/verify.sh

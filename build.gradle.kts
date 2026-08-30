@@ -1,53 +1,17 @@
 plugins {
     base
+    alias(libs.plugins.sborkaLint)
+    // Declared here with `apply false` so the VERSION is named once, in the catalog, and the modules
+    // ask for these by id alone. Asking for a version in a module as well is refused: this project
+    // applies `sborka.lint` at the root, which puts the conventions jar on the buildscript classpath
+    // every module inherits — and a plugin already on the classpath cannot have its version checked.
+    alias(libs.plugins.kotlinMultiplatform) apply false
+    alias(libs.plugins.sborkaKmp) apply false
+    alias(libs.plugins.sborkaPublish) apply false
 }
 
-// The coordinates every module publishes under. Confirmed in the research, decision R1.
-group = "io.github.youndie"
-version = providers.gradleProperty("version").getOrElse("0.1.0-SNAPSHOT")
-
-subprojects {
-    group = rootProject.group
-    version = rootProject.version
-}
-
-// ktlint is wired in as a CLI tool rather than through a wrapper plugin: this project wants
-// exactly version 1.8.0 and exactly its behaviour.
-val ktlint: Configuration = configurations.create("ktlint")
-
-dependencies {
-    // The `-all.jar`, requested through artifact-only notation (`:all@jar`): ktlint-cli publishes
-    // two variants in its Gradle metadata, and resolving the plain one turns into a fight with the
-    // Bundling/Usage attributes — first clikt goes missing (it is runtime-scoped), then
-    // kotlin-stdlib (it has KMP variants of its own). `@jar` ignores the metadata and fetches
-    // exactly the jar that ships as the CLI.
-    ktlint("${libs.ktlint.cli.get().module}:${libs.versions.ktlint.get()}:all@jar")
-}
-
-private val ktlintTargets =
-    listOf(
-        "**/src/**/*.kt",
-        "**/*.kts",
-        "!build-logic/build/**",
-    )
-
-val ktlintCheck =
-    tasks.register<JavaExec>("ktlintCheck") {
-        group = LifecycleBasePlugin.VERIFICATION_GROUP
-        description = "Checks the code style with ktlint as configured in .editorconfig"
-        classpath = ktlint
-        mainClass.set("com.pinterest.ktlint.Main")
-        args = ktlintTargets + listOf("--relative")
-    }
-
-tasks.register<JavaExec>("ktlintFormat") {
-    group = LifecycleBasePlugin.VERIFICATION_GROUP
-    description = "Applies the fixes ktlint can make on its own"
-    classpath = ktlint
-    mainClass.set("com.pinterest.ktlint.Main")
-    args = ktlintTargets + listOf("--relative", "--format")
-}
-
-tasks.check {
-    dependsOn(ktlintCheck)
-}
+// The root used to hold three things: the coordinates, and a ktlint CLI wired in by hand because
+// this project wanted exactly version 1.8.0 and exactly its behaviour. The coordinates are now one
+// line in `gradle.properties` (`sborka.group`), and `sborka.lint` pins the same 1.8.0 — the
+// difference being that it pins it for every repository at once, together with the `.editorconfig`
+// the tool reads, which is the other half of what a formatter's behaviour is.

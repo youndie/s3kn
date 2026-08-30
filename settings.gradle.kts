@@ -1,15 +1,20 @@
 pluginManagement {
-    includeBuild("build-logic")
     repositories {
         mavenCentral()
         gradlePluginPortal()
+        // Written out by hand, and it has to be: `pluginManagement` is evaluated before any settings
+        // plugin is applied — including the sborka one, which is fetched through it.
+        maven("https://reposilite.kotlin.website/snapshots") {
+            name = "wip-snapshots"
+            content { includeGroupByRegex("ru\\.workinprogress.*") }
+        }
     }
 }
 
-dependencyResolutionManagement {
-    repositories {
-        mavenCentral()
-    }
+plugins {
+    // The repositories with their content filters and the shared `wip` catalog, plus the check that
+    // this repository's `.editorconfig` is the one the rest of them use.
+    id("ru.workinprogress.sborka.settings") version "0.1.0.10"
 }
 
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
