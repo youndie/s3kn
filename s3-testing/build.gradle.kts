@@ -1,5 +1,8 @@
 plugins {
-    id("s3kn.kmp")
+    kotlin("multiplatform")
+    id("ru.workinprogress.sborka.kmp")
+    id("ru.workinprogress.sborka.lint")
+    id("ru.workinprogress.sborka.publish")
 }
 
 // Fixtures: the loader for the vendored test vectors, and the switches the live tests read.
@@ -7,6 +10,10 @@ plugins {
 // Deliberately not published. Its loaders find the vectors through an absolute path baked in at
 // build time, so outside a checkout of this repository they point at a directory that does not
 // exist. A published artefact that cannot work anywhere but here would be worse than none.
+//
+// `sborka.publish` is still applied, and on purpose: the guard below is what says "not published",
+// and a guard over tasks that do not exist guards nothing. Applied and disabled, the day someone
+// removes these four lines the module starts publishing and the removal is the visible cause.
 tasks.withType<AbstractPublishToMaven>().configureEach {
     enabled = false
 }
@@ -53,6 +60,24 @@ val generateSpecPath =
     }
 
 kotlin {
+    // THE TARGETS STAY HERE, and the reasons with them. `sborka.kmp` gives the mechanics — explicit
+    // API, the toolchain, warnings as errors, the jvm target compiled to the floor — and declares no
+    // target of its own: the set below is a decision this repository argued out, not a portfolio
+    // default.
+    //
+    // Target platform number one; milestones are closed against it. Apple: the engine there is
+    // `ktor-client-darwin` — `ktor-client-curl` publishes nothing for iOS at all
+    // (docs/research/research-architecture.md, fact 1.11). `watchos` and `tvos` are left out although
+    // every dependency publishes them: no test has ever run there, and "it compiles" is a different
+    // claim from "it works". `macosX64` is left out for a stronger reason: Kotlin has deprecated the
+    // target and nothing here has ever run on it.
+    jvm()
+    linuxX64()
+    macosArm64()
+    iosArm64()
+    iosSimulatorArm64()
+    iosX64()
+
     sourceSets {
         commonMain {
             kotlin.srcDir(generateSpecPath)

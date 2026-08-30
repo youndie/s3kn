@@ -17,12 +17,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: 25
-
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: youndie/sborka/.github/actions/setup-kotlin@main
 
       - name: start MinIO
         run: |
@@ -37,8 +32,12 @@ jobs:
       # One job, not two: this library has no cinterop, so a Linux runner cross-compiles every klib
       # it publishes, macosArm64 included. That falls straight out of the research — the TLS stack
       # arrives inside the engine's klib instead of being bound to system headers.
+      #
+      # The repository is named `wip` by the shared convention; it was `WipSnapshots` here. Same
+      # server, same credentials — and they now arrive as ORG_GRADLE_PROJECT_ properties rather than
+      # bare environment variables, because that is how the convention reads them.
       - name: publish
         env:
-          REPOSILITE_USER: ${{ secrets.REPOSILITE_USER }}
-          REPOSILITE_SECRET: ${{ secrets.REPOSILITE_SECRET }}
-        run: ./gradlew publishAllPublicationsToWipSnapshotsRepository --stacktrace
+          ORG_GRADLE_PROJECT_REPOSILITE_USER: ${{ secrets.REPOSILITE_USER }}
+          ORG_GRADLE_PROJECT_REPOSILITE_SECRET: ${{ secrets.REPOSILITE_SECRET }}
+        run: ./gradlew publishAllPublicationsToWipRepository --stacktrace
