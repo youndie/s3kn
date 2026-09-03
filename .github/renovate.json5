@@ -42,6 +42,15 @@
       groupName: "kotlinx",
     },
     {
+      // The build conventions are one release published under two names: the catalog entry
+      // `sborka` (the plugin coordinates) and the settings plugin id resolved in
+      // settings.gradle.kts. Without this they arrive as two pull requests for one number, which
+      // is what happens today in the repositories that migrated first — and, until now, here.
+      description: "sborka is one release, not one release per place it is named",
+      matchPackageNames: ["/^ru\\.workinprogress\\.sborka/"],
+      groupName: "sborka",
+    },
+    {
       // The reason this rule exists is specific to this library: `ktor-client-curl` links libcurl
       // and OpenSSL statically inside its cinterop klib, so the TLS stack is whatever Ktor shipped
       // (docs/research/research-architecture.md, fact 1.1 and risk 1). A Ktor bump is a TLS bump,
@@ -80,12 +89,12 @@
       // Own branch, so the image never rides along with anything else.
       additionalBranchPrefix: "docker-",
     },
-    {
-      description: "ktlint is build tooling, not a runtime dependency",
-      matchPackageNames: ["/^com\\.pinterest\\.ktlint[:.]/"],
-      matchUpdateTypes: ["minor", "patch"],
-      automerge: true,
-    },
+    // NO KTLINT RULE HERE, AND THAT IS NOT AN OVERSIGHT. This repository declares no ktlint
+    // version anywhere — `sborka.lint` applies the plugin and pins the tool for the whole
+    // portfolio, so what build.gradle.kts spells is its configuration block, not a dependency.
+    // A rule matching `com.pinterest.ktlint` here would match nothing while reading like
+    // protection — checked by extracting this repository and testing the rule against what
+    // came out.
     {
       description: "The build harness arrives as one PR, not one per action",
       matchManagers: ["github-actions"],
