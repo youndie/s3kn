@@ -10,7 +10,7 @@ kotlincrypto = "0.8.0"
 # The shared build conventions. One number: every sborka plugin below takes its version from here.
 # ktlint is gone from this file: `sborka.lint` applies the plugin and pins the tool, so this
 # repository no longer wires the CLI by hand or names a version for it.
-sborka = "0.1.0.10"
+sborka = "0.3.0.41"
 
 [libraries]
 # Reading the vendored specification from a test. The only file API that exists on every target
@@ -38,7 +38,7 @@ kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-t
 kotlin-gradlePlugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
 
 [plugins]
-sborkaKmp = { id = "ru.workinprogress.sborka.kmp", version.ref = "sborka" }
-sborkaLint = { id = "ru.workinprogress.sborka.lint", version.ref = "sborka" }
-sborkaPublish = { id = "ru.workinprogress.sborka.publish", version.ref = "sborka" }
+sborkaKmp = { id = "io.github.youndie.sborka.kmp", version.ref = "sborka" }
+sborkaLint = { id = "io.github.youndie.sborka.lint", version.ref = "sborka" }
+sborkaPublish = { id = "io.github.youndie.sborka.publish", version.ref = "sborka" }
 kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
