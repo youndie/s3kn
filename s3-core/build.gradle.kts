@@ -1,8 +1,8 @@
 plugins {
     kotlin("multiplatform")
-    id("ru.workinprogress.sborka.kmp")
-    id("ru.workinprogress.sborka.lint")
-    id("ru.workinprogress.sborka.publish")
+    id("io.github.youndie.sborka.kmp")
+    id("io.github.youndie.sborka.lint")
+    id("io.github.youndie.sborka.publish")
 }
 
 // THE TARGETS STAY HERE, and the reasons with them. `sborka.kmp` gives the mechanics — explicit API,

@@ -1,7 +1,7 @@
 plugins {
     kotlin("multiplatform")
-    id("ru.workinprogress.sborka.kmp")
-    id("ru.workinprogress.sborka.lint")
+    id("io.github.youndie.sborka.kmp")
+    id("io.github.youndie.sborka.lint")
 }
 
 // The code the README shows, as something the build compiles.
