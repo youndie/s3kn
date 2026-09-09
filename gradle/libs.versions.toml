@@ -10,7 +10,7 @@ kotlincrypto = "0.8.0"
 # The shared build conventions. One number: every sborka plugin below takes its version from here.
 # ktlint is gone from this file: `sborka.lint` applies the plugin and pins the tool, so this
 # repository no longer wires the CLI by hand or names a version for it.
-sborka = "0.3.0.41"
+sborka = "0.4.0.43"
 
 [libraries]
 # Reading the vendored specification from a test. The only file API that exists on every target

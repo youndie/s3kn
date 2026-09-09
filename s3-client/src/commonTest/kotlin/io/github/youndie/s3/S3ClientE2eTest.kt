@@ -98,6 +98,10 @@ class S3ClientE2eTest {
                     "e2e/a b c/d~e+f",
                 )
 
+            @Suppress(
+                "ktlint:kapkan:cancellation-swallowed",
+                "a test collecting per-key failures; nothing cancels this scope",
+            )
             val failures =
                 keys.mapNotNull { key ->
                     runCatching {
