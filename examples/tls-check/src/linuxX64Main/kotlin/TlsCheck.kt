@@ -20,6 +20,10 @@ import kotlin.system.exitProcess
  *
  * Exit code 0 means TLS worked. Anything else means it did not.
  */
+@Suppress(
+    "ktlint:kapkan:cancellation-swallowed",
+    "a one-shot diagnostic in runBlocking: there is nothing here to cancel this scope",
+)
 fun main(): Unit =
     runBlocking {
         val endpoint = "https://s3.us-east-1.amazonaws.com"
