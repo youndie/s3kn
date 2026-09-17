@@ -4,6 +4,11 @@
 # following it would neither give updates nor stay honest about what is being tested. Change the
 # tag deliberately, in its own commit, and re-run the whole suite.
 #
+# `quay.io`, not Docker Hub, and the same images: quay.io is MinIO's own registry, and it serves
+# them anonymously. Docker Hub stopped doing that — every job here failed on
+# `pull access denied for minio/minio` — and a rate limit on a shared runner address is not
+# something this repository can wait out. Same digests, different host.
+#
 #   docker compose up -d --wait minio
 #   docker compose run --rm create-buckets
 #   S3_E2E_ENDPOINT=http://127.0.0.1:9000 ./gradlew :s3-client:linuxX64Test
@@ -14,7 +19,7 @@
 # is meant and reports it honestly.
 services:
   minio:
-    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: s3kn-test-access-key
@@ -34,7 +39,7 @@ services:
   # Creates the buckets the tests expect. The library has no CreateBucket — it is out of the v1
   # scope — so something else has to make them. Started with `run`, not `up`: it is meant to exit.
   create-buckets:
-    image: minio/mc:RELEASE.2025-08-13T08-35-41Z
+    image: quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z
     depends_on:
       minio:
         condition: service_healthy
