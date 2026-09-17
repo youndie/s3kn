@@ -1,0 +1,87 @@
+name: Publish image
+
+# Manual, like the snapshot workflow and for the same reason: an image that appears because someone
+# pushed is an image nobody knows the provenance of.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "An extra tag besides sha-<commit>, such as 0.1.0. Leave empty for none."
+        required: false
+        default: ""
+      latest:
+        description: "Also move :latest to this build"
+        type: boolean
+        default: true
+
+jobs:
+  publish:
+    name: Push to ghcr.io/youndie/s3kn
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    env:
+      REGISTRY_IMAGE: ghcr.io/youndie/s3kn
+      S3_E2E_ENDPOINT: http://127.0.0.1:9000
+      S3_E2E_REQUIRED: "1"
+      # Nothing is pushed that has not reached real AWS over HTTPS from inside the image being
+      # pushed. It is the one check that covers root certificates and name resolution at once, and
+      # both of those are properties of the image rather than of the code.
+      S3KN_IMAGE_TLS_CHECK: "1"
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: youndie/sborka/.github/actions/setup-kotlin@main
+
+      - name: start MinIO
+        run: |
+          docker compose up -d --wait minio
+          docker compose run --rm create-buckets
+
+      # The whole suite, live tests included. An image is something somebody will run in a job they
+      # only look at when the backup is needed.
+      - name: build and test
+        run: ./gradlew build --stacktrace
+
+      # THE IMAGE THAT IS TESTED IS THE IMAGE THAT IS PUSHED: the script builds this exact tag, and
+      # nothing rebuilds it afterwards.
+      - name: name the build
+        id: name
+        run: echo "tag=$REGISTRY_IMAGE:sha-$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: build the image and use it
+        env:
+          S3KN_IMAGE: ${{ steps.name.outputs.tag }}
+        run: ./s3-cli/verify-image.sh
+
+      - name: sign in to the registry
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: push
+        env:
+          BUILD_TAG: ${{ steps.name.outputs.tag }}
+          EXTRA_TAG: ${{ inputs.tag }}
+          MOVE_LATEST: ${{ inputs.latest }}
+        run: |
+          set -eu
+          docker push "$BUILD_TAG"
+
+          # The commit tag is the one that names what is inside. The others are labels somebody
+          # moves, and they are moved here rather than built again so that they cannot end up on a
+          # different image than the one this run tested.
+          if [ -n "$EXTRA_TAG" ]; then
+            docker tag "$BUILD_TAG" "$REGISTRY_IMAGE:$EXTRA_TAG"
+            docker push "$REGISTRY_IMAGE:$EXTRA_TAG"
+          fi
+          if [ "$MOVE_LATEST" = "true" ]; then
+            docker tag "$BUILD_TAG" "$REGISTRY_IMAGE:latest"
+            docker push "$REGISTRY_IMAGE:latest"
+          fi
+
+      - name: server logs
+        if: failure()
+        run: docker compose logs --tail 50

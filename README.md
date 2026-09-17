@@ -32,6 +32,8 @@ library writes the protocol out instead: the signature, and seven HTTP requests.
   fail — parts nobody completes are billed until somebody notices
 - Anything that cannot arrive is refused rather than sent: a key with a `.` path segment, a streamed
   body with no length, a streamed body left unprotected over plain HTTP
+- A command-line binary, `s3kn`, and an image to run it in — the same library, for the scripts and
+  backup jobs that would otherwise carry `mc`
 
 ## Platform support
 
@@ -129,6 +131,48 @@ S3Config(
 )
 ```
 
+## Command line
+
+`s3kn` is the library as a single binary: no configuration file, no `alias set`, nothing written to
+a home directory. Settings arrive in the environment, which is what a container has anyway.
+
+```bash
+export S3_ENDPOINT=https://s3.example.com
+export AWS_ACCESS_KEY_ID=… AWS_SECRET_ACCESS_KEY=…
+
+s3kn cp /dump/d.dump s3://backups/prod/d.dump   # up, multipart when it is large
+s3kn cp s3://backups/prod/d.dump /dump/d.dump   # down, streamed
+s3kn stat s3://backups/prod/d.dump              # what the storage says about it
+s3kn ls -r s3://backups/prod/                   # size in bytes, for awk rather than for a human
+s3kn rm s3://backups/prod/d.dump
+s3kn presign --expires 15m s3://backups/prod/d.dump
+
+pg_dump -Fc | s3kn cp - s3://backups/prod/d.dump  # `-` is stdin, and then there is no temp file
+```
+
+Exit codes carry the difference that matters in a job nobody watches: `1` means the storage refused
+or the network did, `2` means the command line or the environment is wrong — one of those is fixed
+by editing a manifest.
+
+In a container:
+
+```bash
+docker run --rm -e S3_ENDPOINT -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY \
+    -v /dump:/dump ghcr.io/youndie/s3kn cp /dump/d.dump s3://backups/prod/d.dump
+```
+
+The image is `gcr.io/distroless/cc-debian13` plus the binary — no shell, no package manager, and no
+copies of system libraries: every shared library the binary declares is already in that base, which
+is a fact checked with `readelf -d` and by unpacking the image rather than carried over from another
+project. Root certificates come from the base too, and `s3-cli/verify-image.sh` proves it by
+reaching real AWS over HTTPS from inside the image it just built.
+
+Two differences from `mc` worth knowing before a manifest is translated: there are no aliases, so a
+path is `s3://bucket/key` and the endpoint is an environment variable; and a destination ending in
+`/` is not completed with the source's file name — the key is what you wrote. Addressing is
+path-style by default, `--addressing virtual` for AWS. Everything else:
+[docs/features/feature-cli.md](docs/features/feature-cli.md).
+
 ## Gotchas
 
 Four things that cost a day each if you meet them without warning.
@@ -165,11 +209,14 @@ Four things that cost a day each if you meet them without warning.
 | `s3-sigv4` | SigV4 and presigning. Pure Kotlin — no network, no engine, no cinterop |
 | `s3-client` | the seven operations over `ktor-client-core`, on whatever engine you supply |
 | `s3-testing` | vectors and switches for the live tests; not published |
+| `s3-cli` | the `s3kn` binary and its image. The library's first consumer that is not its own test suite |
 
 ## Testing
 
-189 tests on `linuxX64` and on the JVM, 21 of them against a real S3 server. Each cites the line of
-the specification it came from — the copies live in [docs/spec/](docs/spec/) and open offline.
+189 tests for the library on `linuxX64` and on the JVM, 21 of them against a real S3 server, and
+51 more for the binary — four of those drive it against a real server, and one of the four uploads
+a file larger than a part, which is the path a database dump takes. Each cites the line of the
+specification it came from — the copies live in [docs/spec/](docs/spec/) and open offline.
 
 The signer is checked against the **34 official AWS test vectors**, including the four botocore's
 own runner skips: one because a general HTTP parser cannot read a request line containing a space,

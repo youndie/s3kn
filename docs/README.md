@@ -33,11 +33,13 @@
 - [services/s3-sigv4.md](services/s3-sigv4.md) — подпись и presign; без сети и без движка.
 - [services/s3-client.md](services/s3-client.md) — семь операций поверх `HttpClient`.
 - [services/s3-testing.md](services/s3-testing.md) — векторы и переключатели тестов; не публикуется.
+- [services/s3-cli.md](services/s3-cli.md) — бинарь `s3kn` и его образ; не публикуется в Maven.
 - [features/feature-object-io.md](features/feature-object-io.md) — put / get / head / delete.
 - [features/feature-listing.md](features/feature-listing.md) — перечисление бакета.
 - [features/feature-multipart.md](features/feature-multipart.md) — многочастная загрузка.
 - [features/feature-presign.md](features/feature-presign.md) — подписанные ссылки.
-- [../BACKLOG.md](../BACKLOG.md) — вехи M0…M8 и задачи `M-NN`.
+- [features/feature-cli.md](features/feature-cli.md) — командная строка взамен `mc`.
+- [../BACKLOG.md](../BACKLOG.md) — вехи M0…M11 и задачи `M-NN`.
 - [measurements.md](measurements.md) — что измерено на стенде из двух машин и что этот замер
   не доказывает.
 - [../RELEASING.md](../RELEASING.md) — что публикуется, куда и почему одним заданием.
@@ -50,17 +52,19 @@
 ### Protocol (1/1)
 - [x] [protocol-s3](api/protocol-s3.md) — закрыт целиком, все семь операций проверены живыми запросами
 
-### Features (4/4)
+### Features (5/5)
 - [x] [feature-object-io](features/feature-object-io.md) — put / get / head / delete
 - [x] [feature-listing](features/feature-listing.md) — перечисление бакета
 - [x] [feature-multipart](features/feature-multipart.md) — многочастная загрузка
 - [x] [feature-presign](features/feature-presign.md) — подписанные ссылки
+- [x] [feature-cli](features/feature-cli.md) — `cp`, `ls`, `stat`, `rm`, `presign` из оболочки
 
-### Modules (4/4)
+### Modules (5/5)
 - [x] [s3-core](services/s3-core.md) — модель, кодирование, конфигурация
 - [x] [s3-sigv4](services/s3-sigv4.md) — подпись и presign
 - [x] [s3-client](services/s3-client.md) — семь операций поверх `HttpClient`
 - [x] [s3-testing](services/s3-testing.md) — векторы и переключатели; **не публикуется**
+- [x] [s3-cli](services/s3-cli.md) — бинарь и образ; **в Maven не публикуется**
 
 ## Соглашения
 

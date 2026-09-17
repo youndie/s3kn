@@ -68,7 +68,7 @@ docs/spec/          векторы AWS, модель API S3, эталонная 
 docs/features/      feature-<name>.md — что умеет библиотека + BDD (появятся с M3)
 docs/services/      <module-id>.md — модули (появятся с M1)
 docs/templates/     шаблоны документов
-BACKLOG.md          вехи M0…M8, задачи M-NN
+BACKLOG.md          вехи M0…M11, задачи M-NN
 ```
 
 Модули (раскладка принята в ресёрче, Р1):
@@ -78,6 +78,7 @@ BACKLOG.md          вехи M0…M8, задачи M-NN
 :s3-sigv4      подпись и presign. Чистый Kotlin, зависит от :s3-core и KotlinCrypto.
 :s3-client     семь операций поверх ktor-client-core. Знает про HttpClient, не про движок.
 :s3-testing    фикстуры: загрузчик векторов, фейковые ответы, обвязка над MinIO.
+:s3-cli        бинарь `s3kn` и его образ. Первый потребитель библиотеки извне её тестов.
 ```
 
 Зависимости идут только внутрь, к `:s3-core`.

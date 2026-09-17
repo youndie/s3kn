@@ -74,6 +74,37 @@ jobs:
           name: test-reports-macos
           path: '**/build/reports/tests/**'
 
+  # Builds the image `s3kn` ships in and drives it the way a backup job would. On every pull
+  # request, because this is where the failures the library's own suite cannot see live: a shared
+  # library the base image does not carry, root certificates that are not there, an entry point that
+  # is not an entry point. A built image is not a working one.
+  image:
+    name: the image, against MinIO
+    runs-on: ubuntu-latest
+
+    env:
+      # Real AWS over HTTPS from inside the image — only on main, for the same reason the `tls` job
+      # below is. On a pull request the MinIO half still runs, and that is what catches a missing
+      # library.
+      S3KN_IMAGE_TLS_CHECK: ${{ github.event_name == 'push' && '1' || '0' }}
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: youndie/sborka/.github/actions/setup-kotlin@main
+
+      - name: start MinIO
+        run: |
+          docker compose up -d --wait minio
+          docker compose run --rm create-buckets
+
+      - name: build the image and use it
+        run: ./s3-cli/verify-image.sh
+
+      - name: server logs
+        if: failure()
+        run: docker compose logs --tail 50
+
   # Reaches real AWS over HTTPS from inside a container, and checks that the same image without
   # ca-certificates cannot. Only on main: it depends on a service nobody here controls, and a pull
   # request should not go red because AWS had a bad minute.
