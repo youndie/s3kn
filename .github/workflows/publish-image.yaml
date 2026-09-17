@@ -47,13 +47,13 @@ jobs:
       - name: build and test
         run: ./gradlew build --stacktrace
 
-      # THE IMAGE THAT IS TESTED IS THE IMAGE THAT IS PUSHED: the script builds this exact tag, and
-      # nothing rebuilds it afterwards.
+      # THE IMAGES THAT ARE TESTED ARE THE IMAGES THAT ARE PUSHED: the script builds these exact
+      # tags — `<tag>` and `<tag>-shell` — and nothing rebuilds them afterwards.
       - name: name the build
         id: name
         run: echo "tag=$REGISTRY_IMAGE:sha-$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
 
-      - name: build the image and use it
+      - name: build both images and use them
         env:
           S3KN_IMAGE: ${{ steps.name.outputs.tag }}
         run: ./s3-cli/verify-image.sh
@@ -69,18 +69,23 @@ jobs:
         run: |
           set -eu
           docker push "$BUILD_TAG"
+          docker push "$BUILD_TAG-shell"
 
           # The commit tag is the one that names what is inside. The others are labels somebody
           # moves, and they are moved here rather than built again so that they cannot end up on a
-          # different image than the one this run tested.
-          if [ -n "$EXTRA_TAG" ]; then
-            docker tag "$BUILD_TAG" "$REGISTRY_IMAGE:$EXTRA_TAG"
-            docker push "$REGISTRY_IMAGE:$EXTRA_TAG"
-          fi
-          if [ "$MOVE_LATEST" = "true" ]; then
-            docker tag "$BUILD_TAG" "$REGISTRY_IMAGE:latest"
-            docker push "$REGISTRY_IMAGE:latest"
-          fi
+          # different image than the one this run tested. Both variants move together: a chart
+          # pinned to `:latest-shell` and one pinned to `:latest` should never be running different
+          # builds of the same binary.
+          for suffix in "" "-shell"; do
+            if [ -n "$EXTRA_TAG" ]; then
+              docker tag "$BUILD_TAG$suffix" "$REGISTRY_IMAGE:$EXTRA_TAG$suffix"
+              docker push "$REGISTRY_IMAGE:$EXTRA_TAG$suffix"
+            fi
+            if [ "$MOVE_LATEST" = "true" ]; then
+              docker tag "$BUILD_TAG$suffix" "$REGISTRY_IMAGE:latest$suffix"
+              docker push "$REGISTRY_IMAGE:latest$suffix"
+            fi
+          done
 
       - name: server logs
         if: failure()
