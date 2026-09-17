@@ -8,7 +8,7 @@ import io.ktor.client.request.HttpRequestData
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import io.ktor.utils.io.ByteReadChannel
-import io.ktor.utils.io.readRemaining
+import io.ktor.utils.io.readBuffer
 import kotlinx.coroutines.test.runTest
 import kotlinx.io.readByteArray
 import kotlin.test.Test
@@ -108,7 +108,7 @@ class S3ObjectOperationsTest {
                     },
                 )
 
-            val body = client.get("photos", "hello.txt") { it.body.readRemaining().readByteArray() }
+            val body = client.get("photos", "hello.txt") { it.body.readBuffer().readByteArray() }
 
             assertEquals("hello there", body.decodeToString())
         }

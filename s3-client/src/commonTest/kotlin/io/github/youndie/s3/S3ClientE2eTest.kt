@@ -8,7 +8,7 @@ import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.isSuccess
 import io.ktor.utils.io.ByteReadChannel
-import io.ktor.utils.io.readRemaining
+import io.ktor.utils.io.readBuffer
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import kotlinx.io.readByteArray
@@ -153,7 +153,7 @@ class S3ClientE2eTest {
             val key = "e2e/put-get.txt"
 
             val eTag = fixture.client.put(E2E.bucket, key, "stored by put".encodeToByteArray(), "text/plain")
-            val body = fixture.client.get(E2E.bucket, key) { it.body.readRemaining().readByteArray() }
+            val body = fixture.client.get(E2E.bucket, key) { it.body.readBuffer().readByteArray() }
 
             assertNotNull(eTag)
             assertEquals("stored by put", body.decodeToString())
@@ -180,7 +180,7 @@ class S3ClientE2eTest {
             assertEquals(
                 body,
                 fixture.client
-                    .get(E2E.bucket, key) { it.body.readRemaining().readByteArray() }
+                    .get(E2E.bucket, key) { it.body.readBuffer().readByteArray() }
                     .decodeToString(),
             )
         }
@@ -194,7 +194,7 @@ class S3ClientE2eTest {
 
             val part =
                 fixture.client.get(E2E.bucket, key, range = 2L..5L) {
-                    it.body.readRemaining().readByteArray()
+                    it.body.readBuffer().readByteArray()
                 }
 
             assertEquals("2345", part.decodeToString())

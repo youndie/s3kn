@@ -4,7 +4,7 @@ kotlinxIo = "0.9.1"
 # The engine that carries HTTPS on Kotlin/Native lives here, and so does the OpenSSL it links
 # statically. Bumping this line bumps the TLS stack — see docs/research/research-architecture.md,
 # risk 1.
-ktor = "3.5.2"
+ktor = "3.6.0"
 kotlincrypto = "0.8.0"
 # The shared build conventions. One number: every sborka plugin below takes its version from here.
 # ktlint is gone from this file: `sborka.lint` applies the plugin and pins the tool, so this

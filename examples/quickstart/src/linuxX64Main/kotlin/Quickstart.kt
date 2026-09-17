@@ -8,7 +8,7 @@ import io.github.youndie.s3.S3Endpoint
 import io.github.youndie.s3.sigv4.S3Signer
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.curl.Curl
-import io.ktor.utils.io.readRemaining
+import io.ktor.utils.io.readBuffer
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.runBlocking
 import kotlinx.io.readByteArray
@@ -37,7 +37,7 @@ fun main(): Unit =
         client.put("photos", "hello.txt", "hello".encodeToByteArray(), contentType = "text/plain")
 
         // The body is a stream, valid only inside the block — a large object is never held whole.
-        val text = client.get("photos", "hello.txt") { it.body.readRemaining().readByteArray() }
+        val text = client.get("photos", "hello.txt") { it.body.readBuffer().readByteArray() }
         println(text.decodeToString())
 
         client.list("photos", prefix = "hel").collect { page ->
