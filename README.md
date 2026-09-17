@@ -161,6 +161,11 @@ docker run --rm -e S3_ENDPOINT -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY \
     -v /dump:/dump ghcr.io/youndie/s3kn cp /dump/d.dump s3://backups/prod/d.dump
 ```
 
+There is a second tag, `:latest-shell`, for the other shape a job comes in: one that finds a file,
+checks it, uploads it and then asks the storage whether it arrived — `command: [sh, -c, …]`, which
+needs a shell the default image does not have. Same binary, on the `:debug` variant of the same
+base, published by the same run.
+
 The image is `gcr.io/distroless/cc-debian13` plus the binary — no shell, no package manager, and no
 copies of system libraries: every shared library the binary declares is already in that base, which
 is a fact checked with `readelf -d` and by unpacking the image rather than carried over from another

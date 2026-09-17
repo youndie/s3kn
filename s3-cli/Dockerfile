@@ -9,6 +9,20 @@
 #
 # `s3-cli/verify-image.sh` does all of that against the MinIO from `docker-compose.yml`.
 #
+# TWO IMAGES COME OUT OF THIS FILE, and the argument below is the whole difference:
+#
+#     docker build -f s3-cli/Dockerfile -t s3kn .
+#     docker build -f s3-cli/Dockerfile --build-arg BASE=gcr.io/distroless/cc-debian13:debug \
+#         -t s3kn:shell .
+#
+# The second is published as `:latest-shell` and exists for one reason. A Kubernetes job that
+# uploads a backup does more than one thing — it finds the file, checks it is not empty, uploads it,
+# asks the storage whether it arrived — and it says so with `command: [sh, -c, …]`. The default
+# image has no shell at all, so such a job cannot run in it; the `:debug` variant of the same base
+# carries busybox at `/busybox/sh`, with `/busybox` already on `PATH`. Same binary, same glibc, same
+# certificates — an image with a shell is no worse than the `mc` image these jobs used to carry,
+# which had one too.
+#
 # COMPILED OUTSIDE, NOT IN A BUILD STAGE. Kotlin/Native would pull its whole toolchain into every
 # image build; the binary is a single self-contained file, so the stage would buy nothing. What it
 # costs instead is one rule: the file below has to exist before `docker build` runs.
@@ -37,7 +51,8 @@
 # status exists, with a message that mentions no certificates
 # (docs/research/research-architecture.md, risk 2). `verify-image.sh` reaches a real HTTPS endpoint
 # from inside this image so that the claim is tested rather than asserted.
-FROM gcr.io/distroless/cc-debian13
+ARG BASE=gcr.io/distroless/cc-debian13
+FROM ${BASE}
 
 LABEL org.opencontainers.image.source="https://github.com/youndie/s3kn"
 LABEL org.opencontainers.image.description="S3 from a shell script: cp, ls, stat, rm and presign, with no configuration file"
