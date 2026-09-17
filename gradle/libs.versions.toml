@@ -1,5 +1,4 @@
 [versions]
-kotlin = "2.4.10"
 kotlinxCoroutines = "1.11.0"
 kotlinxIo = "0.9.1"
 # The engine that carries HTTPS on Kotlin/Native lives here, and so does the OpenSSL it links
@@ -10,7 +9,10 @@ kotlincrypto = "0.8.0"
 # The shared build conventions. One number: every sborka plugin below takes its version from here.
 # ktlint is gone from this file: `sborka.lint` applies the plugin and pins the tool, so this
 # repository no longer wires the CLI by hand or names a version for it.
-sborka = "0.4.0.43"
+# The shared build conventions, and the compiler with them: the `wip` catalog this release
+# publishes carries `kotlin`, so there is no Kotlin version in this file to drift from the rest
+# of the portfolio.
+sborka = "0.4.0.87"
 
 [libraries]
 # Reading the vendored specification from a test. The only file API that exists on every target
@@ -35,10 +37,8 @@ kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-c
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinxCoroutines" }
 
 
-kotlin-gradlePlugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
 
 [plugins]
 sborkaKmp = { id = "io.github.youndie.sborka.kmp", version.ref = "sborka" }
 sborkaLint = { id = "io.github.youndie.sborka.lint", version.ref = "sborka" }
 sborkaPublish = { id = "io.github.youndie.sborka.publish", version.ref = "sborka" }
-kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
