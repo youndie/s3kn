@@ -3,7 +3,7 @@ package io.github.youndie.s3
 import io.github.youndie.s3.testing.E2E
 import io.github.youndie.s3.testing.environmentVariable
 import io.ktor.utils.io.ByteReadChannel
-import io.ktor.utils.io.readRemaining
+import io.ktor.utils.io.readBuffer
 import kotlinx.coroutines.test.runTest
 import kotlinx.io.readByteArray
 import kotlin.test.Test
@@ -45,7 +45,7 @@ class S3MultipartE2eTest {
             // with a content hash silently stops matching once an upload becomes multipart.
             assertTrue(eTag.contains("-3"), eTag)
             assertEquals(body.size.toLong(), fixture.client.head(E2E.bucket, key).contentLength)
-            assertContentEquals(body, fixture.client.get(E2E.bucket, key) { it.body.readRemaining().readByteArray() })
+            assertContentEquals(body, fixture.client.get(E2E.bucket, key) { it.body.readBuffer().readByteArray() })
         }
 
     @Test
