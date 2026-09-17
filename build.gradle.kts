@@ -5,7 +5,7 @@ plugins {
     // ask for these by id alone. Asking for a version in a module as well is refused: this project
     // applies `sborka.lint` at the root, which puts the conventions jar on the buildscript classpath
     // every module inherits — and a plugin already on the classpath cannot have its version checked.
-    alias(libs.plugins.kotlinMultiplatform) apply false
+    alias(wip.plugins.kotlinMultiplatform) apply false
     alias(libs.plugins.sborkaKmp) apply false
     alias(libs.plugins.sborkaPublish) apply false
 }
