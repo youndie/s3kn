@@ -20,7 +20,7 @@ import kotlin.time.TimeSource
  * minimum part size really is, and whether uploading parts at once is any faster than one at a
  * time.
  *
- * Run against MinIO from `docker-compose.yml`; without `S3_E2E_ENDPOINT` these skip.
+ * Run against the S3 server from `docker-compose.yml`; without `S3_E2E_ENDPOINT` these skip.
  */
 class S3MultipartE2eTest {
     @Test

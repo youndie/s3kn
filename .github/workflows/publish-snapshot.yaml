@@ -19,9 +19,9 @@ jobs:
 
       - uses: youndie/sborka/.github/actions/setup-kotlin@main
 
-      - name: start MinIO
+      - name: start the S3 server
         run: |
-          docker compose up -d --wait minio
+          docker compose up -d --wait s3
           docker compose run --rm create-buckets
 
       # Nothing gets published that has not passed everything, including the live tests. A snapshot

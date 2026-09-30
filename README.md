@@ -237,7 +237,7 @@ behaviour. The key-encoding table is the sharpest of them: its expectations come
 A green vector suite proves nothing by itself, so it is mutated: switching the signer to the other
 path mode fails 10 of the 34, and sorting the presigned query differently fails every presign case.
 
-Live tests run against MinIO from `docker-compose.yml`. They found what no vector could — that
+Live tests run against the S3 server in `docker-compose.yml` — SeaweedFS since MinIO's images were withdrawn (M-130). They found what no vector could — that
 libcurl rewrites the path after signing, that a listing returns a space as `+` rather than `%20`,
 and that the five-mebibyte minimum part size, which the API model declines to state, is real.
 
@@ -268,7 +268,7 @@ Requires JDK 25; Gradle arrives through the wrapper.
 The live tests need an S3 server:
 
 ```bash
-docker compose up -d --wait minio
+docker compose up -d --wait s3
 docker compose run --rm create-buckets
 S3_E2E_ENDPOINT=http://127.0.0.1:9000 ./gradlew build
 ```

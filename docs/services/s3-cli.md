@@ -98,7 +98,7 @@ publishes:
 ## 6. Инфраструктура и деплой
 
 * **Образ:** `ghcr.io/youndie/s3kn`, теги `sha-<коммит>` и `latest`. Выкладывается кнопкой
-  **Publish image** в Actions; ничего не пушится, пока образ не отработал против MinIO **и** не
+  **Publish image** в Actions; ничего не пушится, пока образ не отработал против тестового S3-сервера **и** не
   сходил по HTTPS в настоящий AWS.
 * **Второй тег, `-shell`** (`latest-shell`, `sha-<коммит>-shell`) — тот же бинарь на
   `gcr.io/distroless/cc-debian13:debug`, где лежит busybox (`/busybox/sh`, каталог уже в `PATH`).
@@ -131,7 +131,7 @@ publishes:
 
 ```bash
 ./gradlew :s3-cli:linkReleaseExecutableLinuxX64
-./s3-cli/verify-image.sh          # нужен Docker и MinIO из docker-compose.yml
+./s3-cli/verify-image.sh          # нужен Docker и S3-сервер из docker-compose.yml
 ```
 
 Тесты модуля — `./gradlew :s3-cli:linuxX64Test`; живые из них включаются `S3_E2E_ENDPOINT`.

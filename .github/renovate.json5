@@ -40,13 +40,13 @@
       ],
     },
     {
-      // The tag is pinned because MinIO's `latest` stopped moving on 2025-09-07, so following it
-      // would neither give updates nor stay honest about what is being tested. A new release is
-      // worth knowing about; taking it is a decision, and the whole suite gets re-run after.
+      // The test server is pinned by tag and digest. A new release is worth knowing about; taking
+      // it is a decision, and the whole suite gets re-run after — the server's answers are what the
+      // live tests hold the client against (M-130 replaced MinIO when its images disappeared).
       description: "The test server is pinned deliberately — a new tag is a decision, not a bump",
       matchManagers: ["docker-compose"],
       automerge: false,
-      additionalBranchPrefix: "minio-",
+      additionalBranchPrefix: "test-server-",
       labels: ["dependencies", "test server"],
     },
     {

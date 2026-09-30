@@ -131,8 +131,9 @@ public class S3Client(
      *
      * [contentLength] is required and not a convenience. Without it the engine falls back to
      * chunked transfer encoding, and what happens next is **not the same everywhere**: MinIO
-     * answers `411 MissingContentLength` — the e2e suite here records that answer — while
-     * `ceph/s3-tests` sends the same shape to S3 and expects `200`
+     * answers `411 MissingContentLength`, while SeaweedFS stores the body — the e2e suite records
+     * the answer of the server it runs against — and `ceph/s3-tests` sends the same shape to S3 and
+     * expects `200`
      * (`test_object_write_with_chunked_transfer_encoding`). The API model settles neither: its
      * `MissingContentLength` entry is a line in the general error list and says nothing about
      * framing.

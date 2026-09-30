@@ -37,9 +37,9 @@ jobs:
 
       - uses: youndie/sborka/.github/actions/setup-kotlin@main
 
-      - name: start MinIO
+      - name: start the S3 server
         run: |
-          docker compose up -d --wait minio
+          docker compose up -d --wait s3
           docker compose run --rm create-buckets
 
       # The whole suite, live tests included. An image is something somebody will run in a job they

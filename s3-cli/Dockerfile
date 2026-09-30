@@ -7,7 +7,7 @@
 #     docker run --rm --network host -e S3_ENDPOINT=http://127.0.0.1:9000 \
 #         -e AWS_ACCESS_KEY_ID=… -e AWS_SECRET_ACCESS_KEY=… s3kn ls s3://bucket/
 #
-# `s3-cli/verify-image.sh` does all of that against the MinIO from `docker-compose.yml`.
+# `s3-cli/verify-image.sh` does all of that against the S3 server from `docker-compose.yml`.
 #
 # TWO IMAGES COME OUT OF THIS FILE, and the argument below is the whole difference:
 #
