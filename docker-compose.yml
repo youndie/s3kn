@@ -29,8 +29,10 @@ services:
         target: /etc/s3kn/s3.json
     # Reached as 127.0.0.1, which is not a name any bucket can be a label of, so the tests address it
     # path-style. Nothing here has to change for that; it is a client setting.
+    # A variable with 9000 as its default: CI and a person running compose by hand get 9000 as before, and a
+    # linuxX64 test run with no endpoint brings up its own copy on a port kontainer chooses (M-129).
     ports:
-      - "9000:9000"
+      - "${KONTAINER_PORT_S3_9000:-9000}:9000"
     healthcheck:
       # Answered without credentials, unlike `/`, which a signed request is expected at.
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9000/healthz"]

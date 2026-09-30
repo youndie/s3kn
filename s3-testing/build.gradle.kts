@@ -85,5 +85,11 @@ kotlin {
                 api(libs.kotlinx.io.core)
             }
         }
+        // The live tests' own MinIO on linuxX64, when no endpoint is given (M-129). kontainer is published for
+        // linuxX64 only; the other targets keep reading S3_E2E_ENDPOINT.
+        linuxX64Main.dependencies {
+            implementation(libs.kontainer)
+            implementation(libs.kotlinx.coroutines.core)
+        }
     }
 }

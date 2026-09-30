@@ -100,7 +100,9 @@ BACKLOG.md          вехи M0…M11, задачи M-NN
 
 - **Не подключать `ktor-client-cio` на нативных таргетах**: он зависит от `ktor-network-tls`,
   где на Kotlin/Native стоит `error("TLS sessions are not supported on Native platform.")`.
-  На `linuxX64` HTTPS даёт только `ktor-client-curl` (ресёрч, факт 1.1).
+  На `linuxX64` HTTPS даёт только `ktor-client-curl` (ресёрч, факт 1.1). Исключение одно и не про
+  библиотеку: `:s3-testing` тянет CIO транзитивно через kontainer (M-129) — это обвязка по простому HTTP,
+  и все тестовые клиенты называют движок явно (`realHttpClient()`), так что подменить curl он не может.
 - **Не писать cinterop к OpenSSL.** Он не нужен: криптография SigV4 — чистый Kotlin
   (KotlinCrypto), TLS приезжает статически внутри klib'а движка curl (ресёрч, факты 1.1 и 1.2).
 - **Не заводить второй кодировщик ключа.** Строка в подписи и строка в URL обязаны приходить из

@@ -1,4 +1,6 @@
 [versions]
+# A MinIO of the linuxX64 live tests' own when no endpoint is given (M-129).
+kontainer = "0.1.0.6"
 kotlinxCoroutines = "1.11.0"
 kotlinxIo = "0.9.1"
 # The engine that carries HTTPS on Kotlin/Native lives here, and so does the OpenSSL it links
@@ -15,6 +17,7 @@ kotlincrypto = "0.8.0"
 sborka = "0.4.0.87"
 
 [libraries]
+kontainer = { module = "io.github.youndie.kontainer:kontainer", version.ref = "kontainer" }
 # Reading the vendored specification from a test. The only file API that exists on every target
 # this project declares.
 kotlinx-io-core = { module = "org.jetbrains.kotlinx:kotlinx-io-core", version.ref = "kotlinxIo" }

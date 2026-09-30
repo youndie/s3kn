@@ -30,13 +30,14 @@ public object E2E {
     private val required: Boolean get() = environmentVariable("S3_E2E_REQUIRED") == "1"
 
     /**
-     * The endpoint, or `null` when these tests are switched off.
+     * The endpoint, or `null` when these tests are switched off. With no `S3_E2E_ENDPOINT`, a linuxX64 run
+     * starts an S3 server of its own first, when a Docker Engine is there to start it on (M-129).
      *
      * @throws IllegalStateException when `S3_E2E_REQUIRED=1` and there is no endpoint, so that a
      *   misconfigured CI job fails instead of quietly running nothing.
      */
     public fun endpointOrSkip(): String? {
-        val endpoint = endpoint
+        val endpoint = endpoint ?: ownServerEndpoint()
         check(!(endpoint == null && required)) {
             "S3_E2E_REQUIRED=1 but S3_E2E_ENDPOINT is unset: the tests that need a server would " +
                 "have been skipped without saying so. See docker-compose.yml for how to start it."
@@ -44,3 +45,9 @@ public object E2E {
         return endpoint
     }
 }
+
+/**
+ * A server this process started for itself, or `null` where it cannot start one — any target but linuxX64, or
+ * no Docker Engine on the machine.
+ */
+internal expect fun ownServerEndpoint(): String?
