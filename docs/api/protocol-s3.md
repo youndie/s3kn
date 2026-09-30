@@ -17,7 +17,7 @@ research: research-architecture
 
 Статус реализации: закрыт весь документ — все семь операций v1 работают и проверены живыми
 запросами. Приёмка: 34 официальных вектора для общего SigV4, 20 сгенерированных из botocore для
-правил S3 и presign (`docs/spec/s3-signing-vectors/`), плюс MinIO из `docker-compose.yml`.
+правил S3 и presign (`docs/spec/s3-signing-vectors/`), плюс живой S3-сервер из `docker-compose.yml` (SeaweedFS; до M-130 — MinIO).
 
 ---
 

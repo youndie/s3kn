@@ -23,9 +23,9 @@ import kotlin.test.assertEquals
  * to agree today. The library's own suite cannot find what these find: it never reads a file, never
  * reads the environment and never decides between a single `PUT` and a multipart upload.
  *
- * Run against MinIO from `docker-compose.yml`:
+ * Run against the S3 server from `docker-compose.yml`:
  *
- *     docker compose up -d --wait minio
+ *     docker compose up -d --wait s3
  *     docker compose run --rm create-buckets
  *     S3_E2E_ENDPOINT=http://127.0.0.1:9000 ./gradlew :s3-cli:linuxX64Test
  *
@@ -139,7 +139,7 @@ class CliE2eTest {
         setenv("AWS_ACCESS_KEY_ID", E2E.accessKey, 1)
         setenv("AWS_SECRET_ACCESS_KEY", E2E.secretKey, 1)
         setenv("AWS_REGION", E2E.region, 1)
-        // MinIO is reached as 127.0.0.1, which no bucket can be a DNS label of.
+        // The test server is reached as 127.0.0.1, which no bucket can be a DNS label of.
         setenv("S3_ADDRESSING", "path", 1)
         return Prepared(token())
     }

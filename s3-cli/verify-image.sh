@@ -3,9 +3,9 @@
 #
 #     ./s3-cli/verify-image.sh
 #
-# Run from anywhere; needs Docker, a Linux host, and the MinIO from docker-compose.yml:
+# Run from anywhere; needs Docker, a Linux host, and the S3 server from docker-compose.yml:
 #
-#     docker compose up -d --wait minio
+#     docker compose up -d --wait s3
 #     docker compose run --rm create-buckets
 #
 # This exists because a built image is not a working one. The library's suite never opens a file,
