@@ -273,8 +273,11 @@ docker compose run --rm create-buckets
 S3_E2E_ENDPOINT=http://127.0.0.1:9000 ./gradlew build
 ```
 
-Without `S3_E2E_ENDPOINT` they skip themselves. CI sets `S3_E2E_REQUIRED=1` so that a missing server
-fails the build instead of quietly running nothing — a skipped test reads exactly like a passing one.
+Without `S3_E2E_ENDPOINT`, a `linuxX64` run on a machine with Docker starts an S3 server of its own from
+the same `docker-compose.yml` through [kontainer](https://github.com/youndie/kontainer), on ports it chooses;
+the next run removes it. Elsewhere — the JVM, Apple — they skip themselves. CI sets `S3_E2E_REQUIRED=1` so
+that a missing server fails the build instead of quietly running nothing — a skipped test reads exactly like
+a passing one.
 
 `linuxX64` tests do not run on macOS: the Kotlin Gradle plugin disables the task on a non-Linux
 host. `macosArm64` is declared for the local loop, and CI runs both.

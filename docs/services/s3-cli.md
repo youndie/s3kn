@@ -134,7 +134,7 @@ publishes:
 ./s3-cli/verify-image.sh          # нужен Docker и S3-сервер из docker-compose.yml
 ```
 
-Тесты модуля — `./gradlew :s3-cli:linuxX64Test`; живые из них включаются `S3_E2E_ENDPOINT`.
+Тесты модуля — `./gradlew :s3-cli:linuxX64Test`; живые из них идут против `S3_E2E_ENDPOINT`, а без него на `linuxX64` с Docker — против своего S3-сервера из `docker-compose.yml`, поднятого через kontainer (M-129).
 
 ## 8. Сознательные ограничения и грабли
 

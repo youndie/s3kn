@@ -30,6 +30,14 @@ jobs:
       # request from turning into a download nobody asked for.
       - uses: youndie/sborka/.github/actions/setup-kotlin@main
 
+      # M-129: a linuxX64 run with no endpoint brings up an S3 server of its own through kontainer, from the same
+      # docker-compose.yml. It runs first, on a runner with no S3 server yet, so that it is that path being
+      # exercised. The compose step below stays: the JVM tests need it, and kontainer has no JVM target.
+      - name: linuxX64 live tests on their own S3 server
+        run: ./gradlew :s3-client:linuxX64Test --stacktrace
+        env:
+          S3_E2E_ENDPOINT: ""
+
       # docker-compose is the single source of truth for the test server. A service container would
       # duplicate it here and drift from what a developer runs locally.
       # Two steps: `up --wait` counts a service that exited as a failure, even on exit zero, so a
