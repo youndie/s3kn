@@ -28,7 +28,7 @@ jobs:
       # Java and Gradle in one step, at the version the whole portfolio uses. The action installs
       # both 21 and 25: Gradle runs on the newer one, and having the other present keeps a toolchain
       # request from turning into a download nobody asked for.
-      - uses: youndie/sborka/.github/actions/setup-kotlin@main
+      - uses: youndie/sborka/.github/actions/setup-kotlin@v0.5.0.130
 
       # M-129: a linuxX64 run with no endpoint brings up an S3 server of its own through kontainer, from the same
       # docker-compose.yml. It runs first, on a runner with no S3 server yet, so that it is that path being
@@ -70,7 +70,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - uses: youndie/sborka/.github/actions/setup-kotlin@main
+      - uses: youndie/sborka/.github/actions/setup-kotlin@v0.5.0.130
 
       - name: build
         run: ./gradlew build --stacktrace
@@ -99,7 +99,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - uses: youndie/sborka/.github/actions/setup-kotlin@main
+      - uses: youndie/sborka/.github/actions/setup-kotlin@v0.5.0.130
 
       - name: start the S3 server
         run: |
@@ -123,7 +123,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - uses: youndie/sborka/.github/actions/setup-kotlin@main
+      - uses: youndie/sborka/.github/actions/setup-kotlin@v0.5.0.130
 
       - name: with and without ca-certificates
         run: ./examples/tls-check/verify.sh
